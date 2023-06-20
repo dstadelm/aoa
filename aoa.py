@@ -339,24 +339,6 @@ def main(file: Path) -> None:
             else:
                 print(f"{a.start_node.id} --> {a.end_node.id} #line.dashed")
 
-    print("############### BREADTH FIRST ########################")
-    loop_list = network.start_node.outbound_activities
-    unique_list = [activity.id for activity in loop_list]
-
-    while loop_list:
-        for activity in loop_list:
-            if type(activity) == Activity:
-                print(f"{activity.start_node.id} --> {activity.end_node.id} : {activity.description}")
-            else:
-                print(f"{activity.start_node.id} --> {activity.end_node.id} #line.dashed")
-
-            for a in activity.end_node.outbound_activities:
-                if a.id not in unique_list:
-                    unique_list.append(a.id)
-                    loop_list.append(a)
-
-            loop_list.remove(activity)
-
 
 def parse(file: Path):
     with open(file, "r") as f:
