@@ -29,26 +29,26 @@ class KeyMapping(Enum):
 @dataclass
 class Node:
     id: int
-    erliest_start: Optional[int] = None
-    latest_start: Optional[int] = None
-    inbound_activities: List[Union[Activity, DummyActivity]] = field(default_factory=list)
-    outbound_activities: List[Union[Activity, DummyActivity]] = field(default_factory=list)
-    max_depth: int = 0
+    erliest_start: Optional[int] = field(default=None, compare=False)
+    latest_start: Optional[int] = field(default=None, compare=False)
+    inbound_activities: List[Union[Activity, DummyActivity]] = field(default_factory=list, repr=False, compare=False)
+    outbound_activities: List[Union[Activity, DummyActivity]] = field(default_factory=list, repr=False, compare=False)
+    max_depth: int = field(default=0, compare=False)
 
 
 @dataclass
 class Activity:
     id: int
-    start_node: Node
-    end_node: Node
-    duration: int  # what better way to define time?
-    description: str
-    float: int = 0
+    start_node: Node = field(compare=False)
+    end_node: Node = field(compare=False)
+    duration: int = field(compare=False)  # what better way to define time?
+    description: str = field(compare=False)
+    float: int = field(default=0, compare=False)
 
 
 @dataclass
 class DummyActivity:
-    id: str
+    id: int
     start_node: Node
     end_node: Node
 
@@ -102,8 +102,15 @@ class Network:
             Network.sort_activities_by_predecessor_length(allocatable_activities)
             self.allocate_single_predecessor_activities(allocatable_activities)
             for activity in allocatable_activities:
+                print(self)
                 self.allocate_multi_predessor_activity(activity)
         self.tie_end_node()
+
+    def __repr__(self) -> str:
+        nodes = "Nodes by inbound acticityies:\n"
+        for ia in self.node_by_inbound_activity.keys():
+            nodes += f"  {ia}\n"
+        return nodes
 
     def tie_end_node(self) -> None:
         end_nodes: Dict[int, Node] = {}
@@ -132,10 +139,6 @@ class Network:
         self.largest_node_id += 1
         return self.largest_node_id
 
-    def allocate_dummy_id(self) -> str:
-        self.largest_node_id += 1
-        return f"d{self.largest_node_id}"
-
     def create_start_node(self) -> Node:
         start_node = Node(self.allocate_node_id())
         self.node_dict[start_node.id] = start_node
@@ -161,7 +164,7 @@ class Network:
 
     def create_dummy_activity(self, start_node: Node, end_node: Node) -> None:
         dummy_activity = DummyActivity(
-            id=self.allocate_dummy_id(),
+            id=self.allocate_node_id(),
             start_node=start_node,
             end_node=end_node,
         )
@@ -283,6 +286,8 @@ class Network:
 
         for subset in Network.power_subset(tuple(predecessors)):
             if self.activity_id(set(subset)) in self.node_by_inbound_activity:
+                if set(subset) <= set().union(*activity_dummy_link_set_list):
+                    continue
                 activity_dummy_link_list.append(self.activity_id(set(subset)))
                 activity_dummy_link_set_list.append(set(subset))
                 if set().union(*activity_dummy_link_set_list) == set(predecessors):
