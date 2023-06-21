@@ -54,18 +54,6 @@ class DummyActivity:
 
 
 class Network:
-    largest_node_id = -1
-    dummy_id = -1
-
-    unallocated_activities: YamlActivities = []
-
-    activities: YamlActivities
-    start_node: Node
-    end_node: Optional[Node] = None
-    node_by_inbound_activity: Dict[str, Node] = {}
-
-    node_dict: Dict[int, Node] = {}
-
     @classmethod
     def successor_nodes(cls, node: Node) -> Generator[Node, None, None]:
         yield node
@@ -98,9 +86,14 @@ class Network:
             target.remove(i)
 
     def __init__(self, activities: YamlActivities):
+        self.largest_node_id = -1
+        self.dummy_id = -1
+        self.node_by_inbound_activity: Dict[str, Node] = {}
+        self.node_dict: Dict[int, Node] = {}
         self.activities = activities
-        self.unallocated_activities = copy.deepcopy(activities)
-        self.create_start_node()
+        self.unallocated_activities: YamlActivities = copy.deepcopy(activities)
+        self.start_node: Node = self.create_start_node()
+        self.end_node: Optional[Node] = None
         len_previous_unallocated_activities = 0
         # loop or recursion
         while self.unallocated_activities and len_previous_unallocated_activities != len(self.unallocated_activities):
@@ -143,12 +136,13 @@ class Network:
         self.largest_node_id += 1
         return f"d{self.largest_node_id}"
 
-    def create_start_node(self):
-        self.start_node = Node(self.allocate_node_id())
-        self.node_dict[self.start_node.id] = self.start_node
+    def create_start_node(self) -> Node:
+        start_node = Node(self.allocate_node_id())
+        self.node_dict[start_node.id] = start_node
         for activity in self.activities:
             if KeyMapping.PREDECESSORS.value not in activity or not self.get_predecessors(activity):
-                self.create_activity_from_dict(activity, self.start_node)
+                self.create_activity_from_dict(activity, start_node)
+        return start_node
 
     def create_activity_from_dict(self, yaml_activity: YamlActivity, start_node: Node) -> Activity:
         activity = Activity(
