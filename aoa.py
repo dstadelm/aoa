@@ -72,6 +72,14 @@ class NodeLut(dict):
     def __contains__(self, key: Set[int]) -> bool:
         return super().__contains__(self.to_key(key))
 
+    def items(self):
+        for k, v in super().items():
+            yield self.to_set(k), v
+
+    def keys(self):
+        for k in super().keys():
+            yield self.to_set(k)
+
     def __repr__(self) -> str:
         m = "set, node id\n"
         for k, v in self.items():
@@ -114,7 +122,7 @@ class Network:
     def __init__(self, activities: YamlActivities):
         self.largest_node_id = -1
         self.dummy_id = -1
-        self.node_by_inbound_activity: Dict[str, Node] = {}
+        self.node_lut: NodeLut = NodeLut()
         self.node_dict: Dict[int, Node] = {}
         self.activities = activities
         self.unallocated_activities: YamlActivities = copy.deepcopy(activities)
@@ -134,7 +142,7 @@ class Network:
 
     def __repr__(self) -> str:
         nodes = "Nodes by inbound acticityies:\n"
-        for ia in self.node_by_inbound_activity.keys():
+        for ia in self.node_lut.keys():
             nodes += f"  {ia}\n"
         return nodes
 
@@ -182,7 +190,7 @@ class Network:
             description=yaml_activity[KeyMapping.ACTIVITY.value],
         )
         self.node_dict[activity.end_node.id] = activity.end_node
-        self.node_by_inbound_activity[str(activity.id)] = activity.end_node
+        self.node_lut[{activity.id}] = activity.end_node
         start_node.outbound_activities.append(activity)
         activity.end_node.inbound_activities.append(activity)
         self.unallocated_activities.remove(yaml_activity)
@@ -214,12 +222,12 @@ class Network:
         ids = [activity.id for activity in bindable_activities]
         ids += [acticity.id for acticity in propagated_acticities]
 
-        new_id = self.activity_id(set(ids))
-        self.node_by_inbound_activity[new_id] = end_node
+        new_id = set(ids)
+        self.node_lut[new_id] = end_node
 
         if not bindable_activities:
             logger.warning(f"Unable to bind {new_id}, as the end node only has dummy activities")
-        if new_id in self.node_by_inbound_activity:
+        if new_id in self.node_lut:
             logger.warning(f"{new_id} already exists in activity lut")
 
     def get_allocatable_activities(self) -> YamlActivities:
@@ -296,25 +304,22 @@ class Network:
             return largest_subset, non_end_nodes_of_largest_subset
 
         predecessors = sorted(set(copy.deepcopy(self.get_predecessors(yaml_activity))))
-        activity_direct_link_list: List[str] = []
-        activity_dummy_link_list: List[str] = []
+        activity_direct_link_list: List[Set[int]] = []
         activity_dummy_link_set_list: List[Set[int]] = []
         while predecessors:
             subset, non_end_nodes = find_max_subset(predecessors)
             mergable_subset = subset.difference(non_end_nodes)
             if mergable_subset:
                 self.merge_subset(mergable_subset)
-                new_id = self.activity_id(mergable_subset)
-                activity_direct_link_list.append(new_id)
+                activity_direct_link_list.append(mergable_subset)
                 Network.remove_subset_from_list(predecessors, mergable_subset)
             else:
                 break
 
         for subset in Network.power_subset(predecessors):
-            if self.activity_id(set(subset)) in self.node_by_inbound_activity:
+            if set(subset) in self.node_lut:
                 if set(subset) <= set().union(*activity_dummy_link_set_list):
                     continue
-                activity_dummy_link_list.append(self.activity_id(set(subset)))
                 activity_dummy_link_set_list.append(set(subset))
                 if set.union(*activity_dummy_link_set_list) == set(predecessors):
                     self.minimal_viable_list_update(activity_dummy_link_set_list)
@@ -325,21 +330,21 @@ class Network:
             for index, activity in enumerate(activity_direct_link_list):
                 if index == 0:
                     new_activity = self.create_activity_from_dict(
-                        yaml_activity, self.node_by_inbound_activity[activity]
+                        yaml_activity, self.node_lut[activity]
                     )
                 else:
                     if new_activity:
-                        self.create_dummy_activity(self.node_by_inbound_activity[activity], new_activity.start_node)
-            for activity in activity_dummy_link_list:
+                        self.create_dummy_activity(self.node_lut[activity], new_activity.start_node)
+            for activity in activity_dummy_link_set_list:
                 if new_activity:
                     self.create_dummy_activity(
-                        self.node_by_inbound_activity[activity],
+                        self.node_lut[activity],
                         new_activity.start_node,
                     )
         else:
             floating_node = Node(self.allocate_node_id())
-            for link in activity_dummy_link_list:
-                self.create_dummy_activity(self.node_by_inbound_activity[link], floating_node)
+            for link in activity_dummy_link_set_list:
+                self.create_dummy_activity(self.node_lut[link], floating_node)
 
             new_activity = self.create_activity_from_dict(yaml_activity, floating_node)
             self.node_dict[new_activity.start_node.id] = new_activity.start_node
@@ -384,12 +389,12 @@ class Network:
         3. remove vitual node subset from orig subset
         4. if len of orig subset > 0 goto 1
         """
-        activity_ids_to_link: List[str] = []
+        activity_ids_to_link: List[Set[int]] = []
         mutable_merge_set = list(merge_set)
         while mutable_merge_set:
             for subset in Network.power_subset(mutable_merge_set):
-                if self.activity_id(set(subset)) in self.node_by_inbound_activity:
-                    activity_ids_to_link.append(self.activity_id(set(subset)))
+                if set(subset) in self.node_lut:
+                    activity_ids_to_link.append(set(subset))
                     for item in subset:
                         mutable_merge_set.remove(item)
                     break
@@ -401,31 +406,31 @@ class Network:
         ids_right = {activity.start_node.id for activity in node_right.inbound_activities}
         return True if ids_left.intersection(ids_right) else False
 
-    def recursive_merge(self, head: str, tail: List[str]) -> None:
-        new_id = ""
+    def recursive_merge(self, head: Set[int], tail: List[Set[int]]) -> None:
+        new_head : Set[int] = set()
         if tail:
-            if self.have_common_ancestor(self.node_by_inbound_activity[head], self.node_by_inbound_activity[tail[0]]):
-                self.create_dummy_activity(self.node_by_inbound_activity[head], self.node_by_inbound_activity[tail[0]])
-                new_id = self.merge_ids(head, tail[0])
-                self.node_by_inbound_activity[new_id] = self.node_by_inbound_activity.pop(tail[0])
+            if self.have_common_ancestor(self.node_lut[head], self.node_lut[tail[0]]):
+                self.create_dummy_activity(self.node_lut[head], self.node_lut[tail[0]])
+                new_head = head.union(tail[0])
+                self.node_lut[new_head] = self.node_lut.pop(tail[0])
             else:
-                for activity in self.node_by_inbound_activity[tail[0]].inbound_activities:
-                    self.node_by_inbound_activity[head].inbound_activities.append(activity)
-                self.node_dict.pop(self.node_by_inbound_activity[tail[0]].id)
-                self.node_by_inbound_activity[tail[0]] = self.node_by_inbound_activity[head]
-                new_id = self.merge_ids(head, tail[0])
-                self.node_by_inbound_activity[new_id] = self.node_by_inbound_activity.pop(head)
-                self.node_by_inbound_activity.pop(tail[0])
+                for activity in self.node_lut[tail[0]].inbound_activities:
+                    self.node_lut[head].inbound_activities.append(activity)
+                self.node_dict.pop(self.node_lut[tail[0]].id)
+                self.node_lut[tail[0]] = self.node_lut[head]
+                new_head = head.union(tail[0])
+                self.node_lut[new_head] = self.node_lut.pop(head)
+                self.node_lut.pop(tail[0])
 
-            self.recursive_merge(new_id, tail[1:])
+            self.recursive_merge(new_head, tail[1:])
 
     def link_to_activity_by_id(self, id: int, yaml_activity: YamlActivity) -> None:
-        start_node = self.node_by_inbound_activity[str(id)]
+        start_node = self.node_lut[{id}]
         if start_node:
             self.create_activity_from_dict(yaml_activity, start_node)
 
     def get_allocated_activity_ids(self) -> Set[int]:
-        return {num for id in self.node_by_inbound_activity.keys() for num in self.activities_from_id(id)}
+        return {num for id in self.node_lut.keys() for num in id}
 
     def all_successor_nodes(self) -> Generator[Node, None, None]:
         for node in Network.successor_nodes(self.start_node):
