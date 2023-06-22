@@ -53,6 +53,32 @@ class DummyActivity:
     end_node: Node
 
 
+class NodeLut(dict):
+    def to_key(self, id_set: Set[int]) -> str:
+        return "-".join(map(str, sorted(id_set)))
+
+    def to_set(self, id: str) -> Set[int]:
+        return set([int(i) for i in id.split("-")])
+
+    def __setitem__(self, key: Set[int], value: Node) -> None:
+        super().__setitem__(self.to_key(key), value)
+
+    def __getitem__(self, key: Set[int]) -> Node:
+        return super().__getitem__(self.to_key(key))
+
+    def __delitem__(self, key: Set[int]) -> None:
+        return super().__delitem__(self.to_key(key))
+
+    def __contains__(self, key: Set[int]) -> bool:
+        return super().__contains__(self.to_key(key))
+
+    def __repr__(self) -> str:
+        m = "set, node id\n"
+        for k, v in self.items():
+            m += f"{k}, {v.id}"
+        return m
+
+
 class Network:
     @classmethod
     def successor_nodes(cls, node: Node) -> Generator[Node, None, None]:
@@ -76,9 +102,9 @@ class Network:
         yaml_activities.sort(key=sort_func)
 
     @classmethod
-    def power_subset(cls, predecessors: Tuple[int]) -> List[Tuple[int]]:
-        all_subsets = list(powerset(predecessors))
-        return sorted(all_subsets, key=lambda x: len(x), reverse=True)
+    def power_subset(cls, predecessors: List[int]) -> List[Set[int]]:
+        powersets = [set(x) for x in list(powerset(predecessors))]
+        return sorted(powersets, key=lambda x: len(x), reverse=True)
 
     @classmethod
     def remove_subset_from_list(cls, target: List[int], subset: Set[int]) -> None:
@@ -235,11 +261,11 @@ class Network:
                 k. got f)
         """
 
-        def find_max_subset(predecessors: Tuple[int]) -> Tuple[Set[int], Set[int]]:
+        def find_max_subset(predecessors: List[int]) -> Tuple[Set[int], Set[int]]:
             found = False
             largest_subset: Set[int] = set()
             non_end_nodes_of_largest_subset: Set[int] = set()
-            subset: Tuple[int] = tuple()
+            subset: Set[int] = set()
             non_end_nodes: Set[int] = set()
             for subset in Network.power_subset(predecessors):
                 if len(subset) > 1:
@@ -274,7 +300,7 @@ class Network:
         activity_dummy_link_list: List[str] = []
         activity_dummy_link_set_list: List[Set[int]] = []
         while predecessors:
-            subset, non_end_nodes = find_max_subset(tuple(predecessors))
+            subset, non_end_nodes = find_max_subset(predecessors)
             mergable_subset = subset.difference(non_end_nodes)
             if mergable_subset:
                 self.merge_subset(mergable_subset)
@@ -284,13 +310,14 @@ class Network:
             else:
                 break
 
-        for subset in Network.power_subset(tuple(predecessors)):
+        for subset in Network.power_subset(predecessors):
             if self.activity_id(set(subset)) in self.node_by_inbound_activity:
                 if set(subset) <= set().union(*activity_dummy_link_set_list):
                     continue
                 activity_dummy_link_list.append(self.activity_id(set(subset)))
                 activity_dummy_link_set_list.append(set(subset))
-                if set().union(*activity_dummy_link_set_list) == set(predecessors):
+                if set.union(*activity_dummy_link_set_list) == set(predecessors):
+                    self.minimal_viable_list_update(activity_dummy_link_set_list)
                     break
 
         if activity_direct_link_list:
@@ -316,6 +343,23 @@ class Network:
 
             new_activity = self.create_activity_from_dict(yaml_activity, floating_node)
             self.node_dict[new_activity.start_node.id] = new_activity.start_node
+
+    def minimal_viable_list_update(self, los: List[Set[int]]) -> None:
+        required_ids = set.union(*los)
+        multi_ids = self.get_multiple_allocated_activity_ids(los)
+        for subset in Network.power_subset(multi_ids):
+            if subset in los:
+                los.remove(subset)
+                if set.union(*los) != required_ids:
+                    los.append(subset)
+
+    def get_multiple_allocated_activity_ids(self, los: List[Set[int]]) -> List[int]:
+        return list(
+            map(
+                lambda id: id,
+                [id for id in set.union(*los) if sum([1 for id_set in los if id in id_set]) > 1],
+            )
+        )
 
     def activity_id(self, id_set: Set[int]) -> str:
         return "-".join(map(str, sorted(id_set)))
@@ -343,7 +387,7 @@ class Network:
         activity_ids_to_link: List[str] = []
         mutable_merge_set = list(merge_set)
         while mutable_merge_set:
-            for subset in Network.power_subset(tuple(mutable_merge_set)):
+            for subset in Network.power_subset(mutable_merge_set):
                 if self.activity_id(set(subset)) in self.node_by_inbound_activity:
                     activity_ids_to_link.append(self.activity_id(set(subset)))
                     for item in subset:
