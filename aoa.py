@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Generator, List, Optional, OrderedDict, Set, Tuple, Union
 
 import yaml
 from more_itertools import powerset
@@ -123,7 +123,7 @@ class Network:
         self.largest_node_id = -1
         self.dummy_id = -1
         self.node_lut: NodeLut = NodeLut()
-        self.node_dict: Dict[int, Node] = {}
+        self.node_dict: OrderedDict[int, Node] = OrderedDict()
         self.activities = activities
         self.unallocated_activities: YamlActivities = copy.deepcopy(activities)
         self.start_node: Node = self.create_start_node()
@@ -139,12 +139,21 @@ class Network:
                 print(self)
                 self.allocate_multi_predessor_activity(activity)
         self.tie_end_node()
+        self.renumber_nodes()
 
     def __repr__(self) -> str:
         nodes = "Nodes by inbound acticityies:\n"
         for ia in self.node_lut.keys():
             nodes += f"  {ia}\n"
         return nodes
+
+    def renumber_nodes(self):
+        temp_dict: OrderedDict[int, Node] = OrderedDict()
+        for i, v in enumerate(sorted(self.node_dict.values(), key=lambda x: x.max_depth)):
+            v.id = i
+            temp_dict[i] = v
+
+        self.node_dict = temp_dict
 
     def tie_end_node(self) -> None:
         end_nodes: Dict[int, Node] = {}
@@ -443,7 +452,7 @@ def main(file: Path) -> None:
     project = parse(file)
     network = Network(project["Activities"])
 
-    sorted_nodes = dict(sorted(network.node_dict.items()))
+    sorted_nodes = network.node_dict
     for k, v in sorted_nodes.items():
         print(f"map {k}", "{\n}")
 
