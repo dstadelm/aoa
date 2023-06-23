@@ -50,15 +50,16 @@ class Activity:
     float: int = field(default=0, compare=False)
 
     def __repr__(self):
-        return f"Activity {str(self.id)}"
+        return f"    Activity {str(self.id)}"
 
 
 @dataclass
 class DummyActivity:
     start_node: Node
     end_node: Node
+
     def __repr__(self):
-        return f"Dummy Activity from start node {str(self.start_node.id)}"
+        return f"    Dummy Activity from start node {str(self.start_node.id)}"
 
 
 class NodeDict(dict):
@@ -135,7 +136,6 @@ class Network:
         self.largest_node_id = -1
         self.dummy_id = -1
         self.node_lut: NodeDict = NodeDict()
-        self.node_dict: OrderedDict[int, Node] = OrderedDict()
         self.activities = activities
         self.unallocated_activities: YamlActivities = copy.deepcopy(activities)
         self.start_node: Node = self.create_start_node()
@@ -150,7 +150,7 @@ class Network:
             for activity in allocatable_activities:
                 self.allocate_multi_predessor_activity(activity)
         self.tie_end_node()
-        self.renumber_nodes()
+        # self.renumber_nodes()
 
     def get_node_list(self) -> List[Node]:
         nodes = [self.start_node]
@@ -194,7 +194,9 @@ class Network:
             for id, node in end_nodes.items():
                 if node.id != tie_node.id:
                     if self.have_common_ancestor(node, tie_node):
+                        id_to_unlink = copy.deepcopy(tie_node.start_dependencies)
                         self.create_dummy_activity(node, tie_node)
+                        self.node_lut.pop(id_to_unlink)
                     else:
                         for activity in node.inbound_activities:
                             tie_node.inbound_activities.append(activity)
@@ -210,7 +212,6 @@ class Network:
 
     def create_start_node(self) -> Node:
         start_node = Node(self.allocate_node_id())
-        self.node_dict[start_node.id] = start_node
         for activity in self.activities:
             if KeyMapping.PREDECESSORS.value not in activity or not self.get_predecessors(activity):
                 self.create_activity_from_dict(activity, start_node)
@@ -369,7 +370,8 @@ class Network:
                 self.create_dummy_activity(self.node_lut[link], floating_node)
 
             new_activity = self.create_activity_from_dict(yaml_activity, floating_node)
-            self.node_dict[new_activity.start_node.id] = new_activity.start_node
+
+        print("debug")
 
     def minimal_viable_list_update(self, los: List[Set[int]]) -> None:
         required_ids = set.union(*los)
@@ -538,4 +540,4 @@ if __name__ == "__main__":
     # create_plantuml_network(d["Nodes"], d["Formatting"])
     # create_plantuml_footer()
     logging.basicConfig(level=logging.WARN)
-    main(Path("AoA.yaml"))
+    main(Path("more_tricky.yaml"))
