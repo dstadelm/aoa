@@ -150,7 +150,7 @@ class Network:
             for activity in allocatable_activities:
                 self.allocate_multi_predessor_activity(activity)
         self.tie_end_node()
-        # self.renumber_nodes()
+        self.renumber_nodes()
 
     def get_node_list(self) -> List[Node]:
         nodes = [self.start_node]
@@ -166,17 +166,18 @@ class Network:
                 nodes += "\n"
         return nodes
 
-    def renumber_nodes(self):
+    def renumber_nodes(self) -> None:
         if not self.end_node:
             raise Exception("Undefined end_node")
 
         sorted_nodes: List[Node] = [self.start_node]
-        for node in list(sorted(self.node_lut.values(), key=lambda x: x.id)):
+        for node in list(sorted(self.node_lut.values(), key=lambda x: x.max_depth)):
             if node.id != self.end_node.id:
                 sorted_nodes.append(node)
         sorted_nodes.append(self.end_node)
 
         for index, node in enumerate(sorted_nodes):
+            print(f"old_id = {node.id} new_id = {index} max_depth = {node.max_depth}")
             node.id = index
 
     def tie_end_node(self) -> None:
@@ -240,6 +241,11 @@ class Network:
         end_node.inbound_activities.append(dummy_activity)
 
         end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
+
+        # in the main creation function the activity is created before the dummys are linked to the start node
+        # TODO: Check if the order of execution in the allocate_multi_predessor_activity should be changed
+        for activity in end_node.outbound_activities:
+            activity.end_node.max_depth = end_node.max_depth + 1
 
         start_dependencies = []
         for activity in end_node.inbound_activities:
@@ -541,4 +547,4 @@ if __name__ == "__main__":
     # create_plantuml_network(d["Nodes"], d["Formatting"])
     # create_plantuml_footer()
     logging.basicConfig(level=logging.WARN)
-    main(Path("AoA.yaml"))
+    main(Path("more_tricky.yaml"))
