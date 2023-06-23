@@ -136,14 +136,16 @@ class Network:
         self.largest_node_id = -1
         self.dummy_id = -1
         self.node_lut: NodeDict = NodeDict()
-        self.activities = activities
-        self.unallocated_activities: YamlActivities = copy.deepcopy(activities)
+        self.yaml_activities = activities
+        self.unallocated_yaml_activities: YamlActivities = copy.deepcopy(activities)
         self.start_node: Node = self.create_start_node()
         self.end_node: Optional[Node] = None
         len_previous_unallocated_activities = 0
         # loop or recursion
-        while self.unallocated_activities and len_previous_unallocated_activities != len(self.unallocated_activities):
-            len_previous_unallocated_activities = len(self.unallocated_activities)
+        while self.unallocated_yaml_activities and len_previous_unallocated_activities != len(
+            self.unallocated_yaml_activities
+        ):
+            len_previous_unallocated_activities = len(self.unallocated_yaml_activities)
             allocatable_activities = self.get_allocatable_activities()
             Network.sort_activities_by_predecessor_length(allocatable_activities)
             self.allocate_single_predecessor_activities(allocatable_activities)
@@ -212,7 +214,7 @@ class Network:
 
     def create_start_node(self) -> Node:
         start_node = Node(self.allocate_node_id())
-        for activity in self.activities:
+        for activity in self.yaml_activities:
             if KeyMapping.PREDECESSORS.value not in activity or not self.get_predecessors(activity):
                 self.create_activity_from_dict(activity, start_node)
         return start_node
@@ -228,7 +230,7 @@ class Network:
         start_node.outbound_activities.append(activity)
         activity.end_node.inbound_activities.append(activity)
         self.node_lut[{activity.id}] = activity.end_node
-        self.unallocated_activities.remove(yaml_activity)
+        self.unallocated_yaml_activities.remove(yaml_activity)
         return activity
 
     def create_dummy_activity(self, start_node: Node, end_node: Node) -> Set[int]:
@@ -263,7 +265,7 @@ class Network:
         """activities are allocatable if all there predecessors have been allocated"""
         allocated_activity_ids = self.get_allocated_activity_ids()
         allocatable_activities = []
-        for activity in self.unallocated_activities:
+        for activity in self.unallocated_yaml_activities:
             if set(self.get_predecessors(activity)).issubset(allocated_activity_ids):
                 allocatable_activities.append(copy.deepcopy(activity))
 
@@ -306,7 +308,7 @@ class Network:
             non_end_nodes: Set[int] = set()
             for subset in Network.power_subset(predecessors):
                 if len(subset) > 1:
-                    for activity in self.activities:
+                    for activity in self.yaml_activities:
                         pred = self.get_predecessors(activity)
                         if set(subset) <= set(pred):
                             found = True
@@ -317,7 +319,7 @@ class Network:
                             break
                 else:
                     found_count = 0
-                    for activity in self.activities:
+                    for activity in self.yaml_activities:
                         pred = self.get_predecessors(activity)
                         if set(subset) <= set(pred):
                             found = True
