@@ -333,10 +333,10 @@ class Network:
         while predecessors:
             subset, non_end_nodes = find_max_subset(predecessors)
             mergable_subset = subset.difference(non_end_nodes)
-            if mergable_subset:
+            if len(mergable_subset):
                 if set.union(mergable_subset) not in self.node_lut:
                     self.merge_subset(mergable_subset)
-                    direct_link_start_nodes.append(mergable_subset)
+                direct_link_start_nodes.append(mergable_subset)
                 Network.remove_subset_from_list(predecessors, mergable_subset)
             else:
                 break
@@ -360,10 +360,12 @@ class Network:
                         self.create_dummy_activity(self.node_lut[activity], new_activity.start_node)
             for activity in dummy_link_start_nodes:
                 if new_activity:
+                    node_to_unlink = copy.deepcopy(new_activity.start_node.start_dependencies)
                     self.create_dummy_activity(
                         self.node_lut[activity],
                         new_activity.start_node,
                     )
+                    self.node_lut.pop(node_to_unlink)
         else:
             floating_node = Node(self.allocate_node_id())
             for link in dummy_link_start_nodes:
@@ -540,4 +542,4 @@ if __name__ == "__main__":
     # create_plantuml_network(d["Nodes"], d["Formatting"])
     # create_plantuml_footer()
     logging.basicConfig(level=logging.WARN)
-    main(Path("more_tricky.yaml"))
+    main(Path("AoA.yaml"))
