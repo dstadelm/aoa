@@ -373,8 +373,6 @@ class Network:
 
             new_activity = self.create_activity_from_dict(yaml_activity, floating_node)
 
-        print("debug")
-
     def minimal_viable_list_update(self, los: List[Set[int]]) -> None:
         required_ids = set.union(*los)
         multi_ids = self.get_multiple_allocated_activity_ids(los)
@@ -432,6 +430,7 @@ class Network:
                 self.node_lut.pop(head)
             else:
                 for activity in self.node_lut[tail[0]].inbound_activities:
+                    activity.end_node = self.node_lut[head]
                     self.node_lut[head].inbound_activities.append(activity)
                 new_head = head.union(tail[0])
                 self.node_lut[new_head] = self.node_lut[head]
