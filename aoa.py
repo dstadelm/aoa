@@ -177,7 +177,6 @@ class Network:
         sorted_nodes.append(self.end_node)
 
         for index, node in enumerate(sorted_nodes):
-            print(f"old_id = {node.id} new_id = {index} max_depth = {node.max_depth}")
             node.id = index
 
     def tie_end_node(self) -> None:
