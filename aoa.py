@@ -34,6 +34,10 @@ class Node:
     inbound_activities: List[Union[Activity, DummyActivity]] = field(default_factory=list, repr=False, compare=False)
     outbound_activities: List[Union[Activity, DummyActivity]] = field(default_factory=list, repr=False, compare=False)
     max_depth: int = field(default=0, compare=False)
+    start_dependencies: Set[int] = field(default_factory=set)
+
+    def __post_init__(self):
+        pass  # place init logging stuff here
 
 
 @dataclass
@@ -45,15 +49,19 @@ class Activity:
     description: str = field(compare=False)
     float: int = field(default=0, compare=False)
 
+    def __repr__(self):
+        return f"Activity {str(self.id)}"
+
 
 @dataclass
 class DummyActivity:
-    id: int
     start_node: Node
     end_node: Node
+    def __repr__(self):
+        return f"Dummy Activity from start node {str(self.start_node.id)}"
 
 
-class NodeLut(dict):
+class NodeDict(dict):
     def to_key(self, id_set: Set[int]) -> str:
         return "-".join(map(str, sorted(id_set)))
 
@@ -61,6 +69,7 @@ class NodeLut(dict):
         return set([int(i) for i in id.split("-")])
 
     def __setitem__(self, key: Set[int], value: Node) -> None:
+        value.start_dependencies = key
         super().__setitem__(self.to_key(key), value)
 
     def __getitem__(self, key: Set[int]) -> Node:
@@ -76,6 +85,9 @@ class NodeLut(dict):
         for k, v in super().items():
             yield self.to_set(k), v
 
+    def pop(self, key: Set[int]) -> Node:
+        return super().pop(self.to_key(key))
+
     def keys(self):
         for k in super().keys():
             yield self.to_set(k)
@@ -83,7 +95,7 @@ class NodeLut(dict):
     def __repr__(self) -> str:
         m = "set, node id\n"
         for k, v in self.items():
-            m += f"{k}, {v.id}"
+            m += f"{k}:{v.start_dependencies} {v.id}\n"
         return m
 
 
@@ -122,7 +134,7 @@ class Network:
     def __init__(self, activities: YamlActivities):
         self.largest_node_id = -1
         self.dummy_id = -1
-        self.node_lut: NodeLut = NodeLut()
+        self.node_lut: NodeDict = NodeDict()
         self.node_dict: OrderedDict[int, Node] = OrderedDict()
         self.activities = activities
         self.unallocated_activities: YamlActivities = copy.deepcopy(activities)
@@ -136,47 +148,61 @@ class Network:
             Network.sort_activities_by_predecessor_length(allocatable_activities)
             self.allocate_single_predecessor_activities(allocatable_activities)
             for activity in allocatable_activities:
-                print(self)
                 self.allocate_multi_predessor_activity(activity)
         self.tie_end_node()
         self.renumber_nodes()
 
+    def get_node_list(self) -> List[Node]:
+        nodes = [self.start_node]
+        nodes += list(sorted(self.node_lut.values(), key=lambda x: x.id))
+        return nodes
+
     def __repr__(self) -> str:
-        nodes = "Nodes by inbound acticityies:\n"
-        for ia in self.node_lut.keys():
-            nodes += f"  {ia}\n"
+        nodes = "Nodes key, node id:\n"
+        for key, node in self.node_lut.items():
+            nodes += f"{key} => {node.id}\n"
+            for activity in node.inbound_activities:
+                nodes += activity.__repr__()
+                nodes += "\n"
         return nodes
 
     def renumber_nodes(self):
-        temp_dict: OrderedDict[int, Node] = OrderedDict()
-        for i, v in enumerate(sorted(self.node_dict.values(), key=lambda x: x.max_depth)):
-            v.id = i
-            temp_dict[i] = v
+        if not self.end_node:
+            raise Exception("Undefined end_node")
 
-        self.node_dict = temp_dict
+        sorted_nodes: List[Node] = [self.start_node]
+        for node in list(sorted(self.node_lut.values(), key=lambda x: x.id)):
+            if node.id != self.end_node.id:
+                sorted_nodes.append(node)
+        sorted_nodes.append(self.end_node)
+
+        for index, node in enumerate(sorted_nodes):
+            node.id = index
 
     def tie_end_node(self) -> None:
-        end_nodes: Dict[int, Node] = {}
-        for k, node in enumerate(self.node_dict.values()):
+        end_nodes: NodeDict = NodeDict()
+        tie_node: Node = Node(-1)
+        max_depth: int = -1
+        for id, node in self.node_lut.items():
             if not node.outbound_activities:
-                end_nodes[k] = node
-        if len(end_nodes) > 1:
-            tie_node: Optional[Node] = None
-            max_depth = -1
-            for node in end_nodes.values():
+                end_nodes[id] = node
                 if node.max_depth > max_depth:
-                    tie_node = node
                     max_depth = node.max_depth
+                    tie_node = node
 
-            if tie_node:
-                for node in end_nodes.values():
-                    if node.id != tie_node.id:
-                        if self.have_common_ancestor(node, tie_node):
-                            self.create_dummy_activity(node, tie_node)
-                        else:
-                            for activity in node.inbound_activities:
-                                self.node_dict.pop(activity.end_node.id)
-                                activity.end_node = tie_node
+        if len(end_nodes) > 1:
+            for id, node in end_nodes.items():
+                if node.id != tie_node.id:
+                    if self.have_common_ancestor(node, tie_node):
+                        self.create_dummy_activity(node, tie_node)
+                    else:
+                        for activity in node.inbound_activities:
+                            tie_node.inbound_activities.append(activity)
+                            activity.end_node = tie_node
+                        if node.id != 0:
+                            self.node_lut.pop(node.start_dependencies)
+
+        self.end_node = tie_node
 
     def allocate_node_id(self) -> int:
         self.largest_node_id += 1
@@ -198,16 +224,14 @@ class Network:
             duration=yaml_activity[KeyMapping.DURATION.value],
             description=yaml_activity[KeyMapping.ACTIVITY.value],
         )
-        self.node_dict[activity.end_node.id] = activity.end_node
-        self.node_lut[{activity.id}] = activity.end_node
         start_node.outbound_activities.append(activity)
         activity.end_node.inbound_activities.append(activity)
+        self.node_lut[{activity.id}] = activity.end_node
         self.unallocated_activities.remove(yaml_activity)
         return activity
 
-    def create_dummy_activity(self, start_node: Node, end_node: Node) -> None:
+    def create_dummy_activity(self, start_node: Node, end_node: Node) -> Set[int]:
         dummy_activity = DummyActivity(
-            id=self.allocate_node_id(),
             start_node=start_node,
             end_node=end_node,
         )
@@ -216,28 +240,18 @@ class Network:
 
         end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
 
-        bindable_activities = [activity for activity in end_node.inbound_activities if type(activity) == Activity]
-        bindable_activities += [activity for activity in start_node.inbound_activities if type(activity) == Activity]
-        dummy_activities_start_nodes = [
-            acticity.start_node for acticity in end_node.inbound_activities if type(acticity) == DummyActivity
-        ]
-        propagated_acticities = [
-            activity
-            for start_node in dummy_activities_start_nodes
-            for activity in start_node.inbound_activities
-            if type(activity) == Activity
-        ]
+        start_dependencies = []
+        for activity in end_node.inbound_activities:
+            if activity.start_node.id == 0 and type(activity) == Activity:
+                start_dependencies.append({activity.id})
+            else:
+                start_dependencies.append(activity.start_node.start_dependencies)
 
-        ids = [activity.id for activity in bindable_activities]
-        ids += [acticity.id for acticity in propagated_acticities]
+        new_id = set.union(*start_dependencies)
+        if new_id not in self.node_lut:
+            self.node_lut[new_id] = end_node
 
-        new_id = set(ids)
-        self.node_lut[new_id] = end_node
-
-        if not bindable_activities:
-            logger.warning(f"Unable to bind {new_id}, as the end node only has dummy activities")
-        if new_id in self.node_lut:
-            logger.warning(f"{new_id} already exists in activity lut")
+        return new_id
 
     def get_allocatable_activities(self) -> YamlActivities:
         """activities are allocatable if all there predecessors have been allocated"""
@@ -319,8 +333,9 @@ class Network:
             subset, non_end_nodes = find_max_subset(predecessors)
             mergable_subset = subset.difference(non_end_nodes)
             if mergable_subset:
-                self.merge_subset(mergable_subset)
-                direct_link_start_nodes.append(mergable_subset)
+                if set.union(mergable_subset) not in self.node_lut:
+                    self.merge_subset(mergable_subset)
+                    direct_link_start_nodes.append(mergable_subset)
                 Network.remove_subset_from_list(predecessors, mergable_subset)
             else:
                 break
@@ -380,14 +395,6 @@ class Network:
         str_ids = id.split("-")
         return [int(i) for i in str_ids]
 
-    def merge_ids(self, id_l: str, id_r) -> str:
-        activities_l = self.activities_from_id(id_l)
-        activities_r = self.activities_from_id(id_r)
-        activities = activities_l + activities_r
-        sorted_activities = sorted(activities)
-        activity_tuple = set(sorted_activities)
-        return self.activity_id(activity_tuple)
-
     def merge_subset(self, merge_set: Set[int]) -> None:
         """
         As subsets of the to be merged subset could potentially allready have been merged the following steps are required
@@ -417,17 +424,15 @@ class Network:
         new_head: Set[int] = set()
         if tail:
             if self.have_common_ancestor(self.node_lut[head], self.node_lut[tail[0]]):
-                self.create_dummy_activity(self.node_lut[head], self.node_lut[tail[0]])
-                new_head = head.union(tail[0])
-                self.node_lut[new_head] = self.node_lut.pop(tail[0])
+                new_head = self.create_dummy_activity(self.node_lut[tail[0]], self.node_lut[head])
+                self.node_lut.pop(head)
             else:
                 for activity in self.node_lut[tail[0]].inbound_activities:
                     self.node_lut[head].inbound_activities.append(activity)
-                self.node_dict.pop(self.node_lut[tail[0]].id)
-                self.node_lut[tail[0]] = self.node_lut[head]
                 new_head = head.union(tail[0])
-                self.node_lut[new_head] = self.node_lut.pop(head)
+                self.node_lut[new_head] = self.node_lut[head]
                 self.node_lut.pop(tail[0])
+                self.node_lut.pop(head)
 
             self.recursive_merge(new_head, tail[1:])
 
@@ -452,12 +457,12 @@ def main(file: Path) -> None:
     project = parse(file)
     network = Network(project["Activities"])
 
-    sorted_nodes = network.node_dict
-    for k, v in sorted_nodes.items():
-        print(f"map {k}", "{\n}")
+    sorted_nodes = network.get_node_list()
+    for node in sorted_nodes:
+        print(f"map {node.id}", "{\n}")
 
-    for _, v in sorted_nodes.items():
-        for a in v.outbound_activities:
+    for node in sorted_nodes:
+        for a in node.outbound_activities:
             if type(a) == Activity:
                 print(f"{a.start_node.id} --> {a.end_node.id} : {a.description} ({a.id})")
             else:
@@ -533,4 +538,4 @@ if __name__ == "__main__":
     # create_plantuml_network(d["Nodes"], d["Formatting"])
     # create_plantuml_footer()
     logging.basicConfig(level=logging.WARN)
-    main(Path("more_tricky.yaml"))
+    main(Path("AoA.yaml"))
