@@ -335,7 +335,7 @@ class Network:
             return largest_subset, non_end_nodes_of_largest_subset
 
         predecessors = sorted(set(copy.deepcopy(self.get_predecessors(yaml_activity))))
-        direct_link_start_nodes: List[Set[int]] = []
+        direct_link_start_node: Set[int] = set()
         dummy_link_start_nodes: List[Set[int]] = []
         while predecessors:
             subset, non_end_nodes = find_max_subset(predecessors)
@@ -343,7 +343,10 @@ class Network:
             if len(mergable_subset):
                 if set.union(mergable_subset) not in self.node_lut:
                     self.merge_subset(mergable_subset)
-                direct_link_start_nodes.append(mergable_subset)
+                if direct_link_start_node:
+                    dummy_link_start_nodes.append(mergable_subset)
+                else:
+                    direct_link_start_node = mergable_subset
                 Network.remove_subset_from_list(predecessors, mergable_subset)
             else:
                 break
@@ -357,28 +360,23 @@ class Network:
                     self.minimal_viable_list_update(dummy_link_start_nodes)
                     break
 
-        if direct_link_start_nodes:
-            new_activity: Optional[Activity] = None
-            for index, activity in enumerate(direct_link_start_nodes):
-                if index == 0:
-                    new_activity = self.create_activity_from_dict(yaml_activity, self.node_lut[activity])
-                else:
-                    if new_activity:
-                        self.create_dummy_activity(self.node_lut[activity], new_activity.start_node)
-            for activity in dummy_link_start_nodes:
-                if new_activity:
-                    node_to_unlink = copy.deepcopy(new_activity.start_node.start_dependencies)
-                    self.create_dummy_activity(
-                        self.node_lut[activity],
-                        new_activity.start_node,
-                    )
-                    self.node_lut.pop(node_to_unlink)
+        if direct_link_start_node:
+            linked_start_node: Set[int] = direct_link_start_node
+            for start_node in dummy_link_start_nodes:
+                node_to_unlink = linked_start_node
+                linked_start_node = self.create_dummy_activity(
+                    self.node_lut[start_node],
+                    self.node_lut[direct_link_start_node],
+                )
+                self.node_lut.pop(node_to_unlink)
+            if linked_start_node:
+                self.create_activity_from_dict(yaml_activity, self.node_lut[linked_start_node])
         else:
             floating_node = Node(self.allocate_node_id())
-            for link in dummy_link_start_nodes:
-                self.create_dummy_activity(self.node_lut[link], floating_node)
+            for start_node in dummy_link_start_nodes:
+                self.create_dummy_activity(self.node_lut[start_node], floating_node)
 
-            new_activity = self.create_activity_from_dict(yaml_activity, floating_node)
+            self.create_activity_from_dict(yaml_activity, floating_node)
 
     def minimal_viable_list_update(self, los: List[Set[int]]) -> None:
         required_ids = set.union(*los)
@@ -548,4 +546,4 @@ if __name__ == "__main__":
     # create_plantuml_network(d["Nodes"], d["Formatting"])
     # create_plantuml_footer()
     logging.basicConfig(level=logging.WARN)
-    main(Path("more_tricky.yaml"))
+    main(Path("tricky.yaml"))
