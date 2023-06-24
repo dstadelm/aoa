@@ -243,11 +243,6 @@ class Network:
 
         end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
 
-        # in the main creation function the activity is created before the dummys are linked to the start node
-        # TODO: Check if the order of execution in the allocate_multi_predessor_activity should be changed
-        for activity in end_node.outbound_activities:
-            activity.end_node.max_depth = end_node.max_depth + 1
-
         start_dependencies = []
         for activity in end_node.inbound_activities:
             if activity.start_node.id == 0 and type(activity) == Activity:
@@ -546,4 +541,4 @@ if __name__ == "__main__":
     # create_plantuml_network(d["Nodes"], d["Formatting"])
     # create_plantuml_footer()
     logging.basicConfig(level=logging.WARN)
-    main(Path("tricky.yaml"))
+    main(Path("AoA.yaml"))
