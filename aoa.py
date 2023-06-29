@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import math
 import copy
 import logging
 from dataclasses import dataclass, field
@@ -21,16 +22,25 @@ class KeyMapping(Enum):
     ID = "Id"
     PREDECESSORS = "Predecessors"
     ACTIVITY = "Activity"
-    DURATION = "Duration"
+    EFFORT = "Effort"
     OWNER = "Owner"
-    RESSOURCE = "Ressource"
+    RESOURCE = "Resource"
+    DURATION = "Duration"
+
+ID = KeyMapping.ID.value
+PREDECESSORS = KeyMapping.PREDECESSORS.value
+ACTIVITY = KeyMapping.ACTIVITY.value
+EFFORT = KeyMapping.EFFORT.value
+OWNER = KeyMapping.OWNER.value
+RESOURCE = KeyMapping.RESOURCE
+DURATION = KeyMapping.DURATION.value
 
 
 @dataclass
 class Node:
     id: int
-    erliest_start: Optional[int] = field(default=None, compare=False)
-    latest_start: Optional[int] = field(default=None, compare=False)
+    earliest_start: int = field(default=0, compare=False)
+    latest_start: int = field(default=0, compare=False)
     inbound_activities: List[Union[Activity, DummyActivity]] = field(default_factory=list, repr=False, compare=False)
     outbound_activities: List[Union[Activity, DummyActivity]] = field(default_factory=list, repr=False, compare=False)
     max_depth: int = field(default=0, compare=False)
@@ -45,7 +55,7 @@ class Activity:
     id: int
     start_node: Node = field(compare=False)
     end_node: Node = field(compare=False)
-    duration: int = field(compare=False)  # what better way to define time?
+    duration: int = field(compare=False)
     description: str = field(compare=False)
     float: int = field(default=0, compare=False)
 
@@ -118,7 +128,7 @@ class Network:
         """shortest first"""
 
         def sort_func(x):
-            return len(x[KeyMapping.PREDECESSORS.value])
+            return len(x[PREDECESSORS])
 
         yaml_activities.sort(key=sort_func)
 
@@ -153,8 +163,20 @@ class Network:
                 self.allocate_multi_predessor_activity(activity)
         self.tie_end_node()
         self.renumber_nodes()
+        self.calculate_latest_start()
 
-    def get_node_list(self) -> List[Node]:
+    def calculate_latest_start(self) -> None:
+        nodes = self.get_node_list_sorted_by_depth()
+        nodes_reversed = [nodes[i] for i in range(len(nodes)-1,-1,-1)]
+        for node in nodes_reversed:
+            latest_starts = [activity.end_node.latest_start - activity.duration for activity in node.outbound_activities if type(activity) == Activity ]
+            latest_starts += [activity.end_node.latest_start for activity in node.outbound_activities if type(activity) == DummyActivity ]
+            if latest_starts:
+                node.latest_start = min(latest_starts)
+            else:
+                node.latest_start = node.earliest_start
+
+    def get_node_list_sorted_by_depth(self) -> List[Node]:
         nodes = [self.start_node]
         nodes += list(sorted(self.node_lut.values(), key=lambda x: x.id))
         return nodes
@@ -215,20 +237,22 @@ class Network:
     def create_start_node(self) -> Node:
         start_node = Node(self.allocate_node_id())
         for activity in self.yaml_activities:
-            if KeyMapping.PREDECESSORS.value not in activity or not self.get_predecessors(activity):
+            if PREDECESSORS not in activity or not self.get_predecessors(activity):
                 self.create_activity_from_dict(activity, start_node)
         return start_node
 
     def create_activity_from_dict(self, yaml_activity: YamlActivity, start_node: Node) -> Activity:
+        end_node = Node(self.allocate_node_id(), max_depth=start_node.max_depth + 1)
         activity = Activity(
-            id=yaml_activity[KeyMapping.ID.value],
+            id=yaml_activity[ID],
             start_node=start_node,
-            end_node=Node(self.allocate_node_id(), max_depth=start_node.max_depth + 1),
-            duration=yaml_activity[KeyMapping.DURATION.value],
-            description=yaml_activity[KeyMapping.ACTIVITY.value],
+            end_node=end_node,
+            duration=yaml_activity[DURATION],
+            description=yaml_activity[ACTIVITY],
         )
         start_node.outbound_activities.append(activity)
-        activity.end_node.inbound_activities.append(activity)
+        end_node.inbound_activities.append(activity)
+        end_node.earliest_start = start_node.earliest_start + yaml_activity[DURATION]
         self.node_lut[{activity.id}] = activity.end_node
         self.unallocated_yaml_activities.remove(yaml_activity)
         return activity
@@ -242,6 +266,7 @@ class Network:
         end_node.inbound_activities.append(dummy_activity)
 
         end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
+        end_node.earliest_start = max([start_node.earliest_start, end_node.earliest_start])
 
         start_dependencies = []
         for activity in end_node.inbound_activities:
@@ -274,8 +299,8 @@ class Network:
                 allocatable_activities.remove(yaml_activity)
 
     def get_predecessors(self, activity: YamlActivity) -> List[int]:
-        if KeyMapping.PREDECESSORS.value in activity:
-            return activity[KeyMapping.PREDECESSORS.value]
+        if PREDECESSORS in activity:
+            return activity[PREDECESSORS]
         else:
             return []
 
@@ -458,18 +483,34 @@ class Network:
 
 def main(file: Path) -> None:
     project = parse(file)
-    network = Network(project["Activities"])
+    annotate_with_duration(project)
+    print(project)
+    network = Network(get_activities(project))
 
-    sorted_nodes = network.get_node_list()
+    sorted_nodes = network.get_node_list_sorted_by_depth()
     for node in sorted_nodes:
-        print(f"map {node.id}", "{\n}")
+        print(f"map {node.id}", "{\nearliest start =>",f"{node.earliest_start}\n", "latest start => ", f"{node.latest_start}", "\n}")
 
     for node in sorted_nodes:
         for a in node.outbound_activities:
             if type(a) == Activity:
-                print(f"{a.start_node.id} --> {a.end_node.id} : {a.description} ({a.id})")
+                print(f"{a.start_node.id} --> {a.end_node.id} : {a.description} ({a.id}, {a.duration})")
             else:
                 print(f"{a.start_node.id} --> {a.end_node.id} #line.dashed")
+
+def get_activities(project: Dict[str, Any]) -> YamlActivities:
+    return project["Activities"]
+
+def get_resources(project: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    return {entry["Id"] : entry for entry in project["Resources"]}
+
+def annotate_with_duration(project: Dict[str, Any]):
+    resources = get_resources(project)
+    for activity in get_activities(project):
+        effort = activity["Effort"]
+        pensum = resources[activity["Resource"]]["Pensum"]
+        duration = math.ceil(effort/pensum)
+        activity[DURATION] = duration
 
 
 def parse(file: Path):
