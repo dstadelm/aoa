@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import math
 import copy
 import logging
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -26,6 +26,7 @@ class KeyMapping(Enum):
     OWNER = "Owner"
     RESOURCE = "Resource"
     DURATION = "Duration"
+
 
 ID = KeyMapping.ID.value
 PREDECESSORS = KeyMapping.PREDECESSORS.value
@@ -57,6 +58,8 @@ class Activity:
     end_node: Node = field(compare=False)
     duration: int = field(compare=False)
     description: str = field(compare=False)
+    total_float: int = field(default=0, compare=False)
+    free_float: int = field(default=0, compare=False)
     float: int = field(default=0, compare=False)
 
     def __repr__(self):
@@ -167,14 +170,27 @@ class Network:
 
     def calculate_latest_start(self) -> None:
         nodes = self.get_node_list_sorted_by_depth()
-        nodes_reversed = [nodes[i] for i in range(len(nodes)-1,-1,-1)]
+        nodes_reversed = [nodes[i] for i in range(len(nodes) - 1, -1, -1)]
         for node in nodes_reversed:
-            latest_starts = [activity.end_node.latest_start - activity.duration for activity in node.outbound_activities if type(activity) == Activity ]
-            latest_starts += [activity.end_node.latest_start for activity in node.outbound_activities if type(activity) == DummyActivity ]
+            latest_starts = [
+                activity.end_node.latest_start - activity.duration
+                for activity in node.outbound_activities
+                if type(activity) == Activity
+            ]
+            latest_starts += [
+                activity.end_node.latest_start
+                for activity in node.outbound_activities
+                if type(activity) == DummyActivity
+            ]
             if latest_starts:
                 node.latest_start = min(latest_starts)
             else:
                 node.latest_start = node.earliest_start
+
+            for activity in node.outbound_activities:
+                if type(activity) == Activity:
+                    activity.total_float = activity.end_node.latest_start - activity.duration - node.earliest_start
+                    activity.free_float = activity.end_node.earliest_start - activity.duration - node.earliest_start
 
     def get_node_list_sorted_by_depth(self) -> List[Node]:
         nodes = [self.start_node]
@@ -481,35 +497,98 @@ class Network:
             yield activity
 
 
+@dataclass
+class CriticalPathFormatting:
+    color: str = field(default="black")
+    thickness: int = field(default=4)
+
+
+class DummyActivityFormatting:
+    style: str = field(default="dashed")
+
+
+class PlantUml:
+    def __init__(self, network: Network):
+        self.plantuml: str = ""
+        self.sorted_nodes = network.get_node_list_sorted_by_depth()
+
+    def get_txt(self) -> str:
+        return self._get_header() + self._get_map() + "\n" + self._get_network() + self._get_trailer()
+
+    def write_txt(self, file: Path) -> None:
+        with open(file, "w") as f:
+            f.write(self.get_txt())
+
+    def _get_header(self) -> str:
+        return """@startuml PERT
+left to right direction
+' Horizontal lines: -->, <--, <-->
+' Vertical lines: ->, <-, <->
+title Pert: Project Design
+
+"""
+
+    def _get_trailer(self) -> str:
+        return "\n@enduml"
+
+    def _get_map(self) -> str:
+        map_list = [
+            f"""map {node.id} {{
+    earliest start => {node.earliest_start}
+    latest start => {node.latest_start}
+}}"""
+            for node in self.sorted_nodes
+        ]
+        return "\n".join(map_list)
+
+    def _get_network(self) -> str:
+        network = [
+            f"{a.start_node.id} -{self._line_fmt(a)}-> {a.end_node.id} : {a.description} (Id={a.id}, D={a.duration}, TF={a.total_float}, FF={a.free_float})"
+            if type(a) == Activity
+            else f"{a.start_node.id} -{self._line_fmt(a)}-> {a.end_node.id}"
+            for node in self.sorted_nodes
+            for a in node.outbound_activities
+        ]
+
+        return "\n".join(network)
+
+    def _line_fmt(self, activity: Union[Activity, DummyActivity]) -> str:
+        if type(activity) == Activity:
+            if activity.total_float == 0:
+                return "[thickness=4]"
+            else:
+                return ""
+        if type(activity) == DummyActivity:
+            if activity.start_node.earliest_start == activity.end_node.latest_start:
+                return "[dashed,thickness=4]"
+            else:
+                return "[dashed]"
+        return ""
+
+
 def main(file: Path) -> None:
     project = parse(file)
     annotate_with_duration(project)
-    print(project)
     network = Network(get_activities(project))
+    plantuml = PlantUml(network)
+    # print(plantuml.get_txt())
+    plantuml.write_txt(file.with_suffix(".txt"))
 
-    sorted_nodes = network.get_node_list_sorted_by_depth()
-    for node in sorted_nodes:
-        print(f"map {node.id}", "{\nearliest start =>",f"{node.earliest_start}\n", "latest start => ", f"{node.latest_start}", "\n}")
-
-    for node in sorted_nodes:
-        for a in node.outbound_activities:
-            if type(a) == Activity:
-                print(f"{a.start_node.id} --> {a.end_node.id} : {a.description} ({a.id}, {a.duration})")
-            else:
-                print(f"{a.start_node.id} --> {a.end_node.id} #line.dashed")
 
 def get_activities(project: Dict[str, Any]) -> YamlActivities:
     return project["Activities"]
 
+
 def get_resources(project: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    return {entry["Id"] : entry for entry in project["Resources"]}
+    return {entry["Id"]: entry for entry in project["Resources"]}
+
 
 def annotate_with_duration(project: Dict[str, Any]):
     resources = get_resources(project)
     for activity in get_activities(project):
         effort = activity["Effort"]
         pensum = resources[activity["Resource"]]["Pensum"]
-        duration = math.ceil(effort/pensum)
+        duration = math.ceil(effort / pensum)
         activity[DURATION] = duration
 
 
