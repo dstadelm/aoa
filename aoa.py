@@ -141,7 +141,7 @@ class Network:
 
         allocation_sequence = self.get_allocation_sequence(activities, list(), set())
         for activity in allocation_sequence:
-            self.allocate_multi_predessor_activity(activity)
+            self.allocate_activity(activity)
         self.tie_end_node()
         self.renumber_nodes()
         self.calculate_latest_start()
@@ -291,7 +291,7 @@ class Network:
 
         return new_id
 
-    def allocate_multi_predessor_activity(self, activity: Activity) -> None:
+    def allocate_activity(self, activity: Activity) -> None:
         """
         a. find largest subset of predecessors which exist exlusively throughout all unallocated activities
            exlusive meaning that that no element of the subset exists in an activity without the whole subset
@@ -563,4 +563,4 @@ def parse(file: Path):
 if __name__ == "__main__":
     # args = sys.argv[1:]
     logging.basicConfig(level=logging.WARN)
-    main(Path("test_case_3.yaml"))
+    main(Path("AoA.yaml"))
