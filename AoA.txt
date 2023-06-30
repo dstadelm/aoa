@@ -1,0 +1,78 @@
+@startuml PERT
+left to right direction
+' Horizontal lines: -->, <--, <-->
+' Vertical lines: ->, <-, <->
+title Pert: Project Design
+
+map 0 {
+    earliest start => 0
+    latest start => 0
+}
+map 1 {
+    earliest start => 3
+    latest start => 22
+}
+map 2 {
+    earliest start => 22
+    latest start => 22
+}
+map 3 {
+    earliest start => 22
+    latest start => 22
+}
+map 4 {
+    earliest start => 37
+    latest start => 37
+}
+map 5 {
+    earliest start => 30
+    latest start => 44
+}
+map 6 {
+    earliest start => 30
+    latest start => 44
+}
+map 7 {
+    earliest start => 37
+    latest start => 102
+}
+map 8 {
+    earliest start => 52
+    latest start => 52
+}
+map 9 {
+    earliest start => 45
+    latest start => 110
+}
+map 10 {
+    earliest start => 60
+    latest start => 60
+}
+map 11 {
+    earliest start => 118
+    latest start => 118
+}
+map 12 {
+    earliest start => 118
+    latest start => 118
+}
+0 --> 3 : define topp level requirements (Id=1, D=15, TF=7, FF=7)
+0 --> 1 : setup organisation tools (Id=2, D=3, TF=19, FF=0)
+0 -[thickness=4]-> 2 : analyse memory requirements (Id=3, D=22, TF=0, FF=0)
+1 -[dashed]-> 3
+2 -[dashed,thickness=4]-> 3
+3 --> 7 : define access points (dsp to radar ip) (Id=4, D=8, TF=72, FF=7)
+3 -[thickness=4]-> 4 : define required FFTs (Id=5, D=15, TF=0, FF=0)
+3 --> 5 : define FuSa startegy (Id=6, D=8, TF=14, FF=0)
+3 --> 6 : define HIL strategy (Id=7, D=8, TF=14, FF=0)
+4 -[thickness=4]-> 8 : define arch of FFTs (Id=10, D=15, TF=0, FF=0)
+4 -[dashed]-> 7
+5 --> 8 : analyse FuSa implications on arch (Id=11, D=8, TF=14, FF=14)
+6 --> 8 : analyse HIL implications on arch (Id=12, D=8, TF=14, FF=14)
+7 --> 9 : analyse dsp performance (Id=8, D=8, TF=65, FF=0)
+8 -[thickness=4]-> 10 : define required changes (Id=13, D=8, TF=0, FF=0)
+9 --> 12 : dsp assessement (Id=9, D=8, TF=65, FF=65)
+10 --> 12 : transition unchaged code to ASIC (Id=14, D=43, TF=15, FF=15)
+10 -[thickness=4]-> 11 : implement required changes (Id=15, D=58, TF=0, FF=0)
+11 -[dashed,thickness=4]-> 12
+@enduml

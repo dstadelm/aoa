@@ -22,19 +22,25 @@ class KeyMapping(Enum):
     ID = "Id"
     PREDECESSORS = "Predecessors"
     ACTIVITY = "Activity"
+    ACTIVITIES = "Activities"
     EFFORT = "Effort"
     OWNER = "Owner"
     RESOURCE = "Resource"
+    RESOURCES = "Resources"
     DURATION = "Duration"
+    PENSUM = "Pensum"
 
 
 ID = KeyMapping.ID.value
 PREDECESSORS = KeyMapping.PREDECESSORS.value
 ACTIVITY = KeyMapping.ACTIVITY.value
+ACTIVITIES = KeyMapping.ACTIVITIES.value
 EFFORT = KeyMapping.EFFORT.value
 OWNER = KeyMapping.OWNER.value
-RESOURCE = KeyMapping.RESOURCE
+RESOURCE = KeyMapping.RESOURCE.value
+RESOURCES = KeyMapping.RESOURCES.value
 DURATION = KeyMapping.DURATION.value
+PENSUM = KeyMapping.PENSUM.value
 
 
 @dataclass
@@ -54,10 +60,11 @@ class Node:
 @dataclass
 class Activity:
     id: int
-    start_node: Node = field(compare=False)
-    end_node: Node = field(compare=False)
     duration: int = field(compare=False)
     description: str = field(compare=False)
+    start_node: Node = field(default=Node(-1), compare=False)
+    end_node: Node = field(default=Node(-1), compare=False)
+    predecessors: Set[int] = field(default_factory=set, compare=False)
     total_float: int = field(default=0, compare=False)
     free_float: int = field(default=0, compare=False)
     float: int = field(default=0, compare=False)
@@ -115,27 +122,6 @@ class NodeDict(dict):
 
 class Network:
     @classmethod
-    def successor_nodes(cls, node: Node) -> Generator[Node, None, None]:
-        yield node
-        for activity in node.outbound_activities:
-            Network.successor_nodes(activity.end_node)
-
-    @classmethod
-    def successor_activities(cls, node: Node) -> Generator[Union[Activity, DummyActivity], None, None]:
-        for node in Network.successor_nodes(node):
-            for activity in node.outbound_activities:
-                yield activity
-
-    @classmethod
-    def sort_activities_by_predecessor_length(cls, yaml_activities: YamlActivities):
-        """shortest first"""
-
-        def sort_func(x):
-            return len(x[PREDECESSORS])
-
-        yaml_activities.sort(key=sort_func)
-
-    @classmethod
     def power_subset(cls, predecessors: List[int]) -> List[Set[int]]:
         powersets = [set(x) for x in list(powerset(predecessors))]
         return sorted(powersets, key=lambda x: len(x), reverse=True)
@@ -145,28 +131,49 @@ class Network:
         for i in list(subset):
             target.remove(i)
 
-    def __init__(self, activities: YamlActivities):
+    def __init__(self, activities: List[Activity]):
         self.largest_node_id = -1
         self.dummy_id = -1
         self.node_lut: NodeDict = NodeDict()
-        self.yaml_activities = activities
-        self.unallocated_yaml_activities: YamlActivities = copy.deepcopy(activities)
-        self.start_node: Node = self.create_start_node()
+        self.activities = copy.deepcopy(activities)
+        self.start_node: Node = Node(self.allocate_node_id())
         self.end_node: Optional[Node] = None
-        len_previous_unallocated_activities = 0
-        # loop or recursion
-        while self.unallocated_yaml_activities and len_previous_unallocated_activities != len(
-            self.unallocated_yaml_activities
-        ):
-            len_previous_unallocated_activities = len(self.unallocated_yaml_activities)
-            allocatable_activities = self.get_allocatable_activities()
-            Network.sort_activities_by_predecessor_length(allocatable_activities)
-            self.allocate_single_predecessor_activities(allocatable_activities)
-            for activity in allocatable_activities:
-                self.allocate_multi_predessor_activity(activity)
+
+        allocation_sequence = self.get_allocation_sequence(activities, list(), set())
+        for activity in allocation_sequence:
+            self.allocate_multi_predessor_activity(activity)
         self.tie_end_node()
         self.renumber_nodes()
         self.calculate_latest_start()
+
+    def get_allocation_sequence(
+        self, activities: List[Activity], allocated_activities: List[Activity], allocated_ids: Set[int]
+    ) -> List[Activity]:
+        if activities:
+            allocateable_activities = []
+            allocateable_activity_ids: List[Set[int]] = list()
+            unallocateable_activities = []
+
+            for activity in activities:
+                if not activity.predecessors:
+                    allocateable_activities.append(activity)
+                    allocateable_activity_ids.append({activity.id})
+                elif activity.predecessors.issubset(allocated_ids):
+                    allocateable_activities.append(activity)
+                    allocateable_activity_ids.append({activity.id})
+                else:
+                    unallocateable_activities.append(activity)
+
+            sorted_allocateable_activies = sorted(allocateable_activities, key=lambda x: len(x.predecessors))
+            if len(activities) == unallocateable_activities:
+                raise Exception("Unable to find allocation sequence")
+            return self.get_allocation_sequence(
+                unallocateable_activities,
+                allocated_activities + sorted_allocateable_activies,
+                allocated_ids.union(*allocateable_activity_ids),
+            )
+        else:
+            return allocated_activities
 
     def calculate_latest_start(self) -> None:
         nodes = self.get_node_list_sorted_by_depth()
@@ -250,27 +257,14 @@ class Network:
         self.largest_node_id += 1
         return self.largest_node_id
 
-    def create_start_node(self) -> Node:
-        start_node = Node(self.allocate_node_id())
-        for activity in self.yaml_activities:
-            if PREDECESSORS not in activity or not self.get_predecessors(activity):
-                self.create_activity_from_dict(activity, start_node)
-        return start_node
-
-    def create_activity_from_dict(self, yaml_activity: YamlActivity, start_node: Node) -> Activity:
+    def attach_activity(self, activity: Activity, start_node: Node) -> Activity:
         end_node = Node(self.allocate_node_id(), max_depth=start_node.max_depth + 1)
-        activity = Activity(
-            id=yaml_activity[ID],
-            start_node=start_node,
-            end_node=end_node,
-            duration=yaml_activity[DURATION],
-            description=yaml_activity[ACTIVITY],
-        )
         start_node.outbound_activities.append(activity)
         end_node.inbound_activities.append(activity)
-        end_node.earliest_start = start_node.earliest_start + yaml_activity[DURATION]
+        end_node.earliest_start = start_node.earliest_start + activity.duration
+        activity.end_node = end_node
+        activity.start_node = start_node
         self.node_lut[{activity.id}] = activity.end_node
-        self.unallocated_yaml_activities.remove(yaml_activity)
         return activity
 
     def create_dummy_activity(self, start_node: Node, end_node: Node) -> Set[int]:
@@ -297,30 +291,7 @@ class Network:
 
         return new_id
 
-    def get_allocatable_activities(self) -> YamlActivities:
-        """activities are allocatable if all there predecessors have been allocated"""
-        allocated_activity_ids = self.get_allocated_activity_ids()
-        allocatable_activities = []
-        for activity in self.unallocated_yaml_activities:
-            if set(self.get_predecessors(activity)).issubset(allocated_activity_ids):
-                allocatable_activities.append(copy.deepcopy(activity))
-
-        return allocatable_activities
-
-    def allocate_single_predecessor_activities(self, allocatable_activities: YamlActivities) -> None:
-        local_alloc_activities = copy.deepcopy(allocatable_activities)
-        for yaml_activity in local_alloc_activities:
-            if len(self.get_predecessors(yaml_activity)) == 1:
-                self.link_to_activity_by_id(self.get_predecessors(yaml_activity)[0], yaml_activity)
-                allocatable_activities.remove(yaml_activity)
-
-    def get_predecessors(self, activity: YamlActivity) -> List[int]:
-        if PREDECESSORS in activity:
-            return activity[PREDECESSORS]
-        else:
-            return []
-
-    def allocate_multi_predessor_activity(self, yaml_activity: YamlActivity) -> None:
+    def allocate_multi_predessor_activity(self, activity: Activity) -> None:
         """
         a. find largest subset of predecessors which exist exlusively throughout all unallocated activities
            exlusive meaning that that no element of the subset exists in an activity without the whole subset
@@ -337,6 +308,8 @@ class Network:
         """
 
         def find_max_subset(predecessors: List[int]) -> Tuple[Set[int], Set[int]]:
+            if len(predecessors) == 1:
+                return ({predecessors[0]}, set())
             found = False
             largest_subset: Set[int] = set()
             non_end_nodes_of_largest_subset: Set[int] = set()
@@ -344,8 +317,8 @@ class Network:
             non_end_nodes: Set[int] = set()
             for subset in Network.power_subset(predecessors):
                 if len(subset) > 1:
-                    for activity in self.yaml_activities:
-                        pred = self.get_predecessors(activity)
+                    for activity in self.activities:
+                        pred = activity.predecessors
                         if set(subset) <= set(pred):
                             found = True
                         else:
@@ -355,8 +328,8 @@ class Network:
                             break
                 else:
                     found_count = 0
-                    for activity in self.yaml_activities:
-                        pred = self.get_predecessors(activity)
+                    for activity in self.activities:
+                        pred = activity.predecessors
                         if set(subset) <= set(pred):
                             found = True
                             found_count += 1
@@ -370,7 +343,7 @@ class Network:
 
             return largest_subset, non_end_nodes_of_largest_subset
 
-        predecessors = sorted(set(copy.deepcopy(self.get_predecessors(yaml_activity))))
+        predecessors = sorted(set(copy.deepcopy(activity.predecessors)))
         direct_link_start_node: Set[int] = set()
         dummy_link_start_nodes: List[Set[int]] = []
         while predecessors:
@@ -406,13 +379,15 @@ class Network:
                 )
                 self.node_lut.pop(node_to_unlink)
             if linked_start_node:
-                self.create_activity_from_dict(yaml_activity, self.node_lut[linked_start_node])
-        else:
+                self.attach_activity(activity, self.node_lut[linked_start_node])
+        elif dummy_link_start_nodes:
             floating_node = Node(self.allocate_node_id())
             for start_node in dummy_link_start_nodes:
                 self.create_dummy_activity(self.node_lut[start_node], floating_node)
 
-            self.create_activity_from_dict(yaml_activity, floating_node)
+            self.attach_activity(activity, floating_node)
+        else:
+            self.attach_activity(activity, self.start_node)
 
     def minimal_viable_list_update(self, los: List[Set[int]]) -> None:
         required_ids = set.union(*los)
@@ -430,13 +405,6 @@ class Network:
                 [id for id in set.union(*los) if sum([1 for id_set in los if id in id_set]) > 1],
             )
         )
-
-    def activity_id(self, id_set: Set[int]) -> str:
-        return "-".join(map(str, sorted(id_set)))
-
-    def activities_from_id(self, id: str) -> List[int]:
-        str_ids = id.split("-")
-        return [int(i) for i in str_ids]
 
     def merge_subset(self, merge_set: Set[int]) -> None:
         """
@@ -479,22 +447,6 @@ class Network:
                 self.node_lut.pop(head)
 
             self.recursive_merge(new_head, tail[1:])
-
-    def link_to_activity_by_id(self, id: int, yaml_activity: YamlActivity) -> None:
-        start_node = self.node_lut[{id}]
-        if start_node:
-            self.create_activity_from_dict(yaml_activity, start_node)
-
-    def get_allocated_activity_ids(self) -> Set[int]:
-        return {num for id in self.node_lut.keys() for num in id}
-
-    def all_successor_nodes(self) -> Generator[Node, None, None]:
-        for node in Network.successor_nodes(self.start_node):
-            yield node
-
-    def all_successor_activities(self) -> Generator[Union[Activity, DummyActivity], None, None]:
-        for activity in Network.successor_activities(self.start_node):
-            yield activity
 
 
 @dataclass
@@ -575,19 +527,29 @@ def main(file: Path) -> None:
     plantuml.write_txt(file.with_suffix(".txt"))
 
 
-def get_activities(project: Dict[str, Any]) -> YamlActivities:
-    return project["Activities"]
+def get_activities(project: Dict[str, Any]) -> List[Activity]:
+    return [
+        Activity(
+            id=yaml_activity[ID],
+            duration=yaml_activity[DURATION],
+            description=yaml_activity[ACTIVITY],
+            predecessors=set(yaml_activity[PREDECESSORS]) if PREDECESSORS in yaml_activity else set(),
+        )
+        for yaml_activity in project[ACTIVITIES]
+    ]
 
 
 def get_resources(project: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    return {entry["Id"]: entry for entry in project["Resources"]}
+    if RESOURCES in project:
+        return {entry["Id"]: entry for entry in project[RESOURCES]}
+    return dict()
 
 
 def annotate_with_duration(project: Dict[str, Any]):
     resources = get_resources(project)
-    for activity in get_activities(project):
-        effort = activity["Effort"]
-        pensum = resources[activity["Resource"]]["Pensum"]
+    for activity in project[ACTIVITIES]:
+        effort = activity[EFFORT]
+        pensum = resources[activity[RESOURCE]][PENSUM] if resources else 1.0
         duration = math.ceil(effort / pensum)
         activity[DURATION] = duration
 
@@ -598,67 +560,7 @@ def parse(file: Path):
     return project
 
 
-def get_owner_formatting(activity: YamlActivity, formatting: Dict[str, str]) -> str:
-    return f"text.{formatting[activity['Owner']]}"
-
-
-def create_plantuml_header() -> str:
-    print("@startuml PERT")
-    print("left to right direction")
-    print("' Horizontal lines: -->, <--, <-->")
-    print("' Vertical lines: ->, <-, <->")
-    print("title Pert: Project Design")
-    return ""
-
-
-def create_plantuml_footer() -> str:
-    print("@enduml")
-    return ""
-
-
-def create_plantuml_maps(activitys: List[YamlActivity]) -> str:
-    for index in range(0, len(activitys) + 1):
-        print(f"map {str(index)} ", "{")
-        print("  earliest start => ")
-        print("  latest start => ")
-        print("  float => ")
-    return ""
-
-
-def create_plantuml_network(dependencies: List[YamlActivity], formatting: Dict[str, str]) -> str:
-    for dependency in dependencies:
-        create_plantuml_dependencies(dependency, formatting)
-    return ""
-
-
-def create_plantuml_dependencies(activity: YamlActivity, formatting: YamlActivity) -> str:
-    create_plantuml_activity(activity, formatting)
-    create_plantuml_non_activity_dependency(activity, formatting)
-    return ""
-
-
-def create_plantuml_activity(activity: YamlActivity, formatting: YamlActivity) -> str:
-    predecessor = activity["Predecessors"][0]
-    print(
-        f"{str(predecessor)} --> {str(activity['NodeId'])} #{get_owner_formatting(activity, formatting)} : {activity['Action']}"
-    )
-    return ""
-
-
-def create_plantuml_non_activity_dependency(activity: YamlActivity, formatting: YamlActivity) -> str:
-    for predecessor in activity["Predecessors"][1:]:
-        print(f"{str(predecessor)} --> {str(activity['NodeId'])} #line.dashed")
-    return ""
-
-
 if __name__ == "__main__":
     # args = sys.argv[1:]
-    # parse(Path(args[0]))
-    # d = parse(Path("AoA.yaml"))
-    # create_plantuml_header()
-    # create_plantuml_maps(d["Nodes"])
-    #
-    # create_plantuml_network(d["Nodes"], d["Formatting"])
-    # create_plantuml_footer()
     logging.basicConfig(level=logging.WARN)
-    main(Path("AoA.yaml"))
+    main(Path("test_case_3.yaml"))
