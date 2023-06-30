@@ -307,9 +307,9 @@ class Network:
                 k. got f)
         """
 
-        def find_max_subset(predecessors: List[int]) -> Tuple[Set[int], Set[int]]:
+        def find_max_subset(predecessors: List[int]) -> Set[int]:
             if len(predecessors) == 1:
-                return ({predecessors[0]}, set())
+                return {predecessors[0]}
             found = False
             largest_subset: Set[int] = set()
             non_end_nodes_of_largest_subset: Set[int] = set()
@@ -341,21 +341,20 @@ class Network:
                         largest_subset = set(subset)
                         non_end_nodes_of_largest_subset = non_end_nodes
 
-            return largest_subset, non_end_nodes_of_largest_subset
+            return largest_subset.difference(non_end_nodes_of_largest_subset)
 
         predecessors = sorted(set(copy.deepcopy(activity.predecessors)))
         direct_link_start_node: Set[int] = set()
         dummy_link_start_nodes: List[Set[int]] = []
         while predecessors:
-            subset, non_end_nodes = find_max_subset(predecessors)
-            mergable_subset = subset.difference(non_end_nodes)
+            mergable_subset = find_max_subset(predecessors)
             if len(mergable_subset):
                 if set.union(mergable_subset) not in self.node_lut:
                     self.merge_subset(mergable_subset)
                 if direct_link_start_node:
-                    dummy_link_start_nodes.append(mergable_subset)
+                    dummy_link_start_nodes.append(mergable_subset.copy())
                 else:
-                    direct_link_start_node = mergable_subset
+                    direct_link_start_node = mergable_subset.copy()
                 Network.remove_subset_from_list(predecessors, mergable_subset)
             else:
                 break
