@@ -291,80 +291,65 @@ class Network:
 
         return new_id
 
-    def find_max_subset(self, predecessors: List[int]) -> Set[int]:
+    def find_max_subset(self, predecessors: Set[int]) -> Set[int]:
         if len(predecessors) == 1:
-            return {predecessors[0]}
+            return predecessors
         found = False
         largest_subset: Set[int] = set()
         non_end_nodes_of_largest_subset: Set[int] = set()
         subset: Set[int] = set()
         non_end_nodes: Set[int] = set()
-        for subset in Network.power_subset(predecessors):
+        for subset in Network.power_subset(list(predecessors)):
             if len(subset) > 1:
                 for activity in self.activities:
                     pred = activity.predecessors
-                    if set(subset) <= set(pred):
+                    if subset <= pred:
                         found = True
                     else:
                         non_end_nodes = non_end_nodes.union({i for i in subset if i in pred})
-                    if non_end_nodes == set(predecessors):
+                    if non_end_nodes == predecessors:
                         found = False
                         break
             else:
                 found_count = 0
                 for activity in self.activities:
                     pred = activity.predecessors
-                    if set(subset) <= set(pred):
+                    if subset <= pred:
                         found = True
                         found_count += 1
                         if found_count > 1:
                             found = False
                             break
             if found:
-                if len(set(subset).difference(non_end_nodes)) > len(largest_subset):
-                    largest_subset = set(subset)
+                if len(subset.difference(non_end_nodes)) > len(largest_subset):
+                    largest_subset = subset
                     non_end_nodes_of_largest_subset = non_end_nodes
 
         return largest_subset.difference(non_end_nodes_of_largest_subset)
 
     def allocate_activity(self, activity: Activity) -> None:
-        """
-        a. find largest subset of predecessors which exist exlusively throughout all unallocated activities
-           exlusive meaning that that no element of the subset exists in an activity without the whole subset
-        b. if subset found
-            c. merge subset
-            d. link to subset
-            e. remove subset from predecessor list
-            f. goto a)
-        g. if predecessor list has at least one entry
-            h. find largest subset for which a virtual predecessor exists
-                i. link the subset
-                j. remove subset from predecessor list
-                k. got f)
-        """
-
-        predecessors = sorted(set(copy.deepcopy(activity.predecessors)))
+        predecessors = activity.predecessors.copy()
         direct_link_start_node: Set[int] = set()
         dummy_link_start_nodes: List[Set[int]] = []
         while predecessors:
             mergable_subset = self.find_max_subset(predecessors)
-            if len(mergable_subset):
+            if mergable_subset:
                 if set.union(mergable_subset) not in self.node_lut:
                     self.merge_subset(mergable_subset)
                 if direct_link_start_node:
                     dummy_link_start_nodes.append(mergable_subset.copy())
                 else:
                     direct_link_start_node = mergable_subset.copy()
-                Network.remove_subset_from_list(predecessors, mergable_subset)
+                predecessors.difference_update(mergable_subset)
             else:
                 break
 
-        for subset in Network.power_subset(predecessors):
-            if set(subset) in self.node_lut:
-                if set(subset) <= set().union(*dummy_link_start_nodes):
+        for subset in Network.power_subset(list(predecessors)):
+            if subset in self.node_lut:
+                if subset <= set().union(*dummy_link_start_nodes):
                     continue
-                dummy_link_start_nodes.append(set(subset))
-                if set.union(*dummy_link_start_nodes) == set(predecessors):
+                dummy_link_start_nodes.append(subset)
+                if set.union(*dummy_link_start_nodes) == predecessors:
                     self.minimal_viable_list_update(dummy_link_start_nodes)
                     break
 
@@ -561,5 +546,8 @@ def parse(file: Path):
 
 if __name__ == "__main__":
     # args = sys.argv[1:]
-    logging.basicConfig(level=logging.WARN)
+    logger = logging.getLogger(__name__)
+    FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
+    logging.basicConfig(format=FORMAT)
+    logger.setLevel(logging.DEBUG)
     main(Path("AoA.yaml"))
