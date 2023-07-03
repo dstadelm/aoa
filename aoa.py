@@ -7,7 +7,7 @@ import math
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional, OrderedDict, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 import yaml
 from more_itertools import powerset
@@ -126,11 +126,6 @@ class Network:
         powersets = [set(x) for x in list(powerset(predecessors))]
         return sorted(powersets, key=lambda x: len(x), reverse=True)
 
-    @classmethod
-    def remove_subset_from_list(cls, target: List[int], subset: Set[int]) -> None:
-        for i in list(subset):
-            target.remove(i)
-
     def __init__(self, activities: List[Activity]):
         self.largest_node_id = -1
         self.dummy_id = -1
@@ -246,7 +241,7 @@ class Network:
                     max_depth = node.max_depth
                     tie_node = node
 
-        del(end_nodes[tie_node.start_dependencies])
+        del end_nodes[tie_node.start_dependencies]
 
         for id, node in end_nodes.items():
             if self.have_common_ancestor(node, tie_node):
@@ -575,4 +570,4 @@ if __name__ == "__main__":
     FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
     logging.basicConfig(format=FORMAT)
     logger.setLevel(logging.DEBUG)
-    main(Path("AoA.yaml"))
+    main(Path("test_case_3.yaml"))
