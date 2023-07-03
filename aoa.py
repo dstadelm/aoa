@@ -276,7 +276,7 @@ class Network:
         self.node_lut[{activity.id}] = activity.end_node
         return activity
 
-    def create_dummy_activity(self, start_node: Node, end_node: Node) -> Node:
+    def create_dummy_activity(self, start_node: Node, end_node: Node) -> Set[int]:
         dummy_activity = DummyActivity(
             start_node=start_node,
             end_node=end_node,
@@ -292,7 +292,7 @@ class Network:
         if end_node.start_dependencies not in self.node_lut:
             self.node_lut[end_node.start_dependencies] = end_node
 
-        return end_node
+        return end_node.start_dependencies
 
     def find_max_subset(self, predecessors: Set[int]) -> Set[int]:
         if len(predecessors) == 1:
@@ -329,9 +329,9 @@ class Network:
 
         return largest_subset.difference(non_end_nodes_of_largest_subset)
 
-    def create_start_node(self, predecessors: Set[int]) -> Optional[Node]:
+    def create_start_node(self, predecessors: Set[int]) -> Optional[Set[int]]:
         if predecessors in self.node_lut:
-            return self.node_lut[predecessors]
+            return predecessors
 
         mutable_node_id = predecessors.copy()
         for pred_sets in self.get_sets_that_contain_ids_in_set(predecessors):
@@ -342,48 +342,47 @@ class Network:
 
         if mutable_node_id:
             self.merge_subset(mutable_node_id)
-            return self.node_lut[mutable_node_id]
+            return mutable_node_id
         else:
             return None
 
     def allocate_activity(self, activity: Activity) -> None:
         predecessors = activity.predecessors.copy()
-        if direct_link_start_node := self.create_start_node(predecessors):
-            predecessors.difference_update(direct_link_start_node.start_dependencies)
+        if direct_link_start_node := self.create_start_node(predecessors.copy()):
+            predecessors.difference_update(direct_link_start_node)
 
-        dummy_link_start_nodes: List[Node] = list()
+        dummy_link_start_nodes: List[Set[int]] = list()
         for subset in Network.power_subset(list(predecessors))[1:]:
-            if dummy_link_start_node := self.create_start_node(predecessors):
+            if dummy_link_start_node := self.create_start_node(predecessors.copy()):
                 dummy_link_start_nodes.append(dummy_link_start_node)
-                predecessors.difference_update(dummy_link_start_node.start_dependencies)
+                predecessors.difference_update(dummy_link_start_node)
             if not predecessors:
                 break
 
         for subset in Network.power_subset(list(predecessors)):
             if subset in self.node_lut:
-                dummy_link_start_nodes.append(self.node_lut[subset])
+                dummy_link_start_nodes.append(subset)
                 predecessors.difference_update(subset)
             if not predecessors:
                 break
 
-        id_sets = self.minimal_viable_list([node.start_dependencies for node in dummy_link_start_nodes])
-        dummy_link_start_nodes = [node for node in dummy_link_start_nodes if node.start_dependencies in id_sets]
+        dummy_link_start_nodes = self.minimal_viable_list(dummy_link_start_nodes)
 
         if direct_link_start_node:
-            linked_start_node: Node = direct_link_start_node
+            linked_start_node: Set[int] = direct_link_start_node
             for start_node in dummy_link_start_nodes:
-                node_to_unlink = linked_start_node.start_dependencies
+                node_to_unlink = linked_start_node
                 linked_start_node = self.create_dummy_activity(
-                    start_node,
-                    direct_link_start_node,
+                    self.node_lut[start_node],
+                    self.node_lut[direct_link_start_node],
                 )
                 self.node_lut.pop(node_to_unlink)
             if linked_start_node:
-                self.attach_activity(activity, linked_start_node)
+                self.attach_activity(activity, self.node_lut[linked_start_node])
         elif dummy_link_start_nodes:
             floating_node = Node(self.allocate_node_id())
             for start_node in dummy_link_start_nodes:
-                self.create_dummy_activity(start_node, floating_node)
+                self.create_dummy_activity(self.node_lut[start_node], floating_node)
 
             self.attach_activity(activity, floating_node)
         else:
@@ -445,7 +444,7 @@ class Network:
         new_head: Set[int] = set()
         if tail:
             if self.have_common_ancestor(self.node_lut[head], self.node_lut[tail[0]]):
-                new_head = self.create_dummy_activity(self.node_lut[tail[0]], self.node_lut[head]).start_dependencies
+                new_head = self.create_dummy_activity(self.node_lut[tail[0]], self.node_lut[head])
                 self.node_lut.pop(head)
             else:
                 for activity in self.node_lut[tail[0]].inbound_activities:
@@ -576,4 +575,4 @@ if __name__ == "__main__":
     FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
     logging.basicConfig(format=FORMAT)
     logger.setLevel(logging.DEBUG)
-    main(Path("more_tricky.yaml"))
+    main(Path("AoA.yaml"))
