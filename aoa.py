@@ -135,6 +135,7 @@ class Network:
         self.largest_node_id = -1
         self.dummy_id = -1
         self.node_lut: NodeDict = NodeDict()
+        self.reverse_predecessor_lut: Dict[int, List[Set[int]]] = dict()
         self.activities = copy.deepcopy(activities)
         self.start_node: Node = Node(self.allocate_node_id())
         self.end_node: Optional[Node] = None
@@ -145,6 +146,14 @@ class Network:
         self.tie_end_node()
         self.renumber_nodes()
         self.calculate_latest_start()
+
+    def get_sets_that_contain_ids_in_set(self, id_set: Set[int]) -> List[Set[int]]:
+        if not self.reverse_predecessor_lut:
+            for activity in self.activities:
+                for id in activity.predecessors:
+                    self.reverse_predecessor_lut.setdefault(id, []).append(activity.predecessors)
+
+        return [subset for id in id_set for subset in self.reverse_predecessor_lut[id]]
 
     def get_allocation_sequence(
         self, activities: List[Activity], allocated_activities: List[Activity], allocated_ids: Set[int]
@@ -295,9 +304,8 @@ class Network:
         non_end_nodes: Set[int] = set()
         for subset in Network.power_subset(list(predecessors)):
             if len(subset) > 1:
-                for activity in self.activities:
-                    pred = activity.predecessors
-                    if subset <= pred:
+                for pred in self.get_sets_that_contain_ids_in_set(subset):
+                    if subset.issubset(pred):
                         found = True
                     else:
                         non_end_nodes = non_end_nodes.union({i for i in subset if i in pred})
@@ -544,4 +552,4 @@ if __name__ == "__main__":
     FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
     logging.basicConfig(format=FORMAT)
     logger.setLevel(logging.DEBUG)
-    main(Path("more_tricky.yaml"))
+    main(Path("AoA.yaml"))
