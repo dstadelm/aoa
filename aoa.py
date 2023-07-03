@@ -278,18 +278,12 @@ class Network:
         end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
         end_node.earliest_start = max([start_node.earliest_start, end_node.earliest_start])
 
-        start_dependencies = []
-        for activity in end_node.inbound_activities:
-            if activity.start_node.id == 0 and type(activity) == Activity:
-                start_dependencies.append({activity.id})
-            else:
-                start_dependencies.append(activity.start_node.start_dependencies)
+        end_node.start_dependencies = end_node.start_dependencies.union(start_node.start_dependencies)
 
-        new_id = set.union(*start_dependencies)
-        if new_id not in self.node_lut:
-            self.node_lut[new_id] = end_node
+        if end_node.start_dependencies not in self.node_lut:
+            self.node_lut[end_node.start_dependencies] = end_node
 
-        return new_id
+        return end_node.start_dependencies
 
     def find_max_subset(self, predecessors: Set[int]) -> Set[int]:
         if len(predecessors) == 1:
@@ -550,4 +544,4 @@ if __name__ == "__main__":
     FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
     logging.basicConfig(format=FORMAT)
     logger.setLevel(logging.DEBUG)
-    main(Path("AoA.yaml"))
+    main(Path("more_tricky.yaml"))
