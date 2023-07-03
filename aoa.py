@@ -291,6 +291,42 @@ class Network:
 
         return new_id
 
+    def find_max_subset(self, predecessors: List[int]) -> Set[int]:
+        if len(predecessors) == 1:
+            return {predecessors[0]}
+        found = False
+        largest_subset: Set[int] = set()
+        non_end_nodes_of_largest_subset: Set[int] = set()
+        subset: Set[int] = set()
+        non_end_nodes: Set[int] = set()
+        for subset in Network.power_subset(predecessors):
+            if len(subset) > 1:
+                for activity in self.activities:
+                    pred = activity.predecessors
+                    if set(subset) <= set(pred):
+                        found = True
+                    else:
+                        non_end_nodes = non_end_nodes.union({i for i in subset if i in pred})
+                    if non_end_nodes == set(predecessors):
+                        found = False
+                        break
+            else:
+                found_count = 0
+                for activity in self.activities:
+                    pred = activity.predecessors
+                    if set(subset) <= set(pred):
+                        found = True
+                        found_count += 1
+                        if found_count > 1:
+                            found = False
+                            break
+            if found:
+                if len(set(subset).difference(non_end_nodes)) > len(largest_subset):
+                    largest_subset = set(subset)
+                    non_end_nodes_of_largest_subset = non_end_nodes
+
+        return largest_subset.difference(non_end_nodes_of_largest_subset)
+
     def allocate_activity(self, activity: Activity) -> None:
         """
         a. find largest subset of predecessors which exist exlusively throughout all unallocated activities
@@ -307,47 +343,11 @@ class Network:
                 k. got f)
         """
 
-        def find_max_subset(predecessors: List[int]) -> Set[int]:
-            if len(predecessors) == 1:
-                return {predecessors[0]}
-            found = False
-            largest_subset: Set[int] = set()
-            non_end_nodes_of_largest_subset: Set[int] = set()
-            subset: Set[int] = set()
-            non_end_nodes: Set[int] = set()
-            for subset in Network.power_subset(predecessors):
-                if len(subset) > 1:
-                    for activity in self.activities:
-                        pred = activity.predecessors
-                        if set(subset) <= set(pred):
-                            found = True
-                        else:
-                            non_end_nodes = non_end_nodes.union({i for i in subset if i in pred})
-                        if non_end_nodes == set(predecessors):
-                            found = False
-                            break
-                else:
-                    found_count = 0
-                    for activity in self.activities:
-                        pred = activity.predecessors
-                        if set(subset) <= set(pred):
-                            found = True
-                            found_count += 1
-                            if found_count > 1:
-                                found = False
-                                break
-                if found:
-                    if len(set(subset).difference(non_end_nodes)) > len(largest_subset):
-                        largest_subset = set(subset)
-                        non_end_nodes_of_largest_subset = non_end_nodes
-
-            return largest_subset.difference(non_end_nodes_of_largest_subset)
-
         predecessors = sorted(set(copy.deepcopy(activity.predecessors)))
         direct_link_start_node: Set[int] = set()
         dummy_link_start_nodes: List[Set[int]] = []
         while predecessors:
-            mergable_subset = find_max_subset(predecessors)
+            mergable_subset = self.find_max_subset(predecessors)
             if len(mergable_subset):
                 if set.union(mergable_subset) not in self.node_lut:
                     self.merge_subset(mergable_subset)
