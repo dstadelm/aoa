@@ -246,19 +246,19 @@ class Network:
                     max_depth = node.max_depth
                     tie_node = node
 
-        if len(end_nodes) > 1:
-            for id, node in end_nodes.items():
-                if node.id != tie_node.id:
-                    if self.have_common_ancestor(node, tie_node):
-                        id_to_unlink = copy.deepcopy(tie_node.start_dependencies)
-                        self.create_dummy_activity(node, tie_node)
-                        self.node_lut.pop(id_to_unlink)
-                    else:
-                        for activity in node.inbound_activities:
-                            tie_node.inbound_activities.append(activity)
-                            activity.end_node = tie_node
-                        if node.id != 0:
-                            self.node_lut.pop(node.start_dependencies)
+        del(end_nodes[tie_node.start_dependencies])
+
+        for id, node in end_nodes.items():
+            if self.have_common_ancestor(node, tie_node):
+                id_to_unlink = copy.deepcopy(tie_node.start_dependencies)
+                self.create_dummy_activity(node, tie_node)
+                self.node_lut.pop(id_to_unlink)
+            else:
+                for activity in node.inbound_activities:
+                    tie_node.inbound_activities.append(activity)
+                    activity.end_node = tie_node
+                if node.id != 0:
+                    self.node_lut.pop(node.start_dependencies)
 
         self.end_node = tie_node
 
