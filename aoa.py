@@ -390,21 +390,23 @@ class Network:
             self.attach_activity(activity, self.start_node)
 
     def minimal_viable_list(self, los: List[Set[int]]) -> List[Set[int]]:
-        result_list = [set()]
-        if los:
-            los = sorted(los, key=lambda x: len(x))
-            required_ids = set.union(*los)
-            start_list = los.copy()
-            for _ in range(len(los)):
-                popped_value = start_list.pop(0)
-                if not start_list:
-                    start_list = [set()]
-                if set.union(*start_list).union(*result_list) != required_ids:
-                    result_list.append(popped_value)
+        los = sorted(los, key=lambda x: len(x))
+        return self.mvl_recursion(los, [])
 
-        return result_list
+    def mvl_recursion(self, start: List[Set[int]], result: List[Set[int]]) -> List[Set[int]]:
+        if not start:
+            return result
+        result_union = self.get_union(result)
+        target = result_union.union(self.get_union(start))
+        if result_union.union(self.get_union(start[1:])) != target:
+            result.append(start[0])
+        return self.mvl_recursion(start[1:], result)
 
-
+    def get_union(self, list_of_sets: List[Set[int]]) -> Set[int]:
+        if list_of_sets:
+            return set.union(*list_of_sets)
+        else:
+            return set()
 
     def get_multiple_allocated_activity_ids(self, los: List[Set[int]]) -> List[int]:
         return list(
@@ -574,4 +576,4 @@ if __name__ == "__main__":
     FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
     logging.basicConfig(format=FORMAT)
     logger.setLevel(logging.DEBUG)
-    main(Path("AoA.yaml"))
+    main(Path("more_tricky.yaml"))
