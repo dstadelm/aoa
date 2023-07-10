@@ -245,9 +245,7 @@ class Network:
 
         for id, node in end_nodes.items():
             if self.have_common_ancestor(node, tie_node):
-                id_to_unlink = copy.deepcopy(tie_node.start_dependencies)
                 self.create_dummy_activity(node, tie_node)
-                self.node_lut.pop(id_to_unlink)
             else:
                 for activity in node.inbound_activities:
                     tie_node.inbound_activities.append(activity)
@@ -282,47 +280,16 @@ class Network:
         end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
         end_node.earliest_start = max([start_node.earliest_start, end_node.earliest_start])
 
+        if end_node.start_dependencies in self.node_lut:
+            if self.node_lut[end_node.start_dependencies].id == end_node.id:
+                self.node_lut.pop(end_node.start_dependencies)
+
         end_node.start_dependencies = end_node.start_dependencies.union(start_node.start_dependencies)
 
         if end_node.start_dependencies not in self.node_lut:
             self.node_lut[end_node.start_dependencies] = end_node
 
         return end_node.start_dependencies
-
-    def find_max_subset(self, predecessors: Set[int]) -> Set[int]:
-        if len(predecessors) == 1:
-            return predecessors
-        found = False
-        largest_subset: Set[int] = set()
-        non_end_nodes_of_largest_subset: Set[int] = set()
-        subset: Set[int] = set()
-        non_end_nodes: Set[int] = set()
-        for subset in Network.power_subset(list(predecessors)):
-            if len(subset) > 1:
-                for pred in self.get_sets_that_contain_ids_in_set(subset):
-                    if subset.issubset(pred):
-                        found = True
-                    else:
-                        non_end_nodes = non_end_nodes.union({i for i in subset if i in pred})
-                    if non_end_nodes == predecessors:
-                        found = False
-                        break
-            else:
-                found_count = 0
-                for activity in self.activities:
-                    pred = activity.predecessors
-                    if subset <= pred:
-                        found = True
-                        found_count += 1
-                        if found_count > 1:
-                            found = False
-                            break
-            if found:
-                if len(subset.difference(non_end_nodes)) > len(largest_subset):
-                    largest_subset = subset
-                    non_end_nodes_of_largest_subset = non_end_nodes
-
-        return largest_subset.difference(non_end_nodes_of_largest_subset)
 
     def create_start_node(self, predecessors: Set[int]) -> Optional[Set[int]]:
         if predecessors in self.node_lut:
@@ -366,12 +333,10 @@ class Network:
         if direct_link_start_node:
             linked_start_node: Set[int] = direct_link_start_node
             for start_node in dummy_link_start_nodes:
-                node_to_unlink = linked_start_node
                 linked_start_node = self.create_dummy_activity(
                     self.node_lut[start_node],
                     self.node_lut[direct_link_start_node],
                 )
-                self.node_lut.pop(node_to_unlink)
             if linked_start_node:
                 self.attach_activity(activity, self.node_lut[linked_start_node])
         elif dummy_link_start_nodes:
@@ -440,7 +405,6 @@ class Network:
         if tail:
             if self.have_common_ancestor(self.node_lut[head], self.node_lut[tail[0]]):
                 new_head = self.create_dummy_activity(self.node_lut[tail[0]], self.node_lut[head])
-                self.node_lut.pop(head)
             else:
                 for activity in self.node_lut[tail[0]].inbound_activities:
                     activity.end_node = self.node_lut[head]
@@ -570,4 +534,8 @@ if __name__ == "__main__":
     FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
     logging.basicConfig(format=FORMAT)
     logger.setLevel(logging.DEBUG)
-    main(Path("test_case_3.yaml"))
+    # main(Path("AoA.yaml"))
+    # main(Path("tricky.yaml"))
+    main(Path("more_tricky.yaml"))
+    # main(Path("test_case_3.yaml"))
+    # main(Path("test_case_4.yaml"))
