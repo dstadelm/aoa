@@ -128,7 +128,6 @@ class Network:
 
     def __init__(self, activities: List[Activity]):
         self.largest_node_id = -1
-        self.dummy_id = -1
         self.node_lut: NodeDict = NodeDict()
         self.reverse_predecessor_lut: Dict[int, List[Set[int]]] = dict()
         self.activities = copy.deepcopy(activities)
@@ -310,19 +309,29 @@ class Network:
 
     def allocate_activity(self, activity: Activity) -> None:
         predecessors = activity.predecessors.copy()
-        if direct_link_start_node := self.create_start_node(predecessors.copy()):
-            predecessors.difference_update(direct_link_start_node)
+        tie_node: Optional[Node] = None
+
+        # if it exists find the node to which all predecessors can be bound
+        if tie_node_id := self.create_start_node(predecessors.copy()):
+            predecessors.difference_update(tie_node_id)
+            tie_node = self.node_lut[tie_node_id]
 
         dummy_link_start_nodes: List[Set[int]] = list()
+        # find subsets that can be created from existing sub-subsets
         for subset in Network.power_subset(list(predecessors))[1:]:
             if dummy_link_start_node := self.create_start_node(predecessors.copy()):
+                if not tie_node:
+                    tie_node = Node(self.allocate_node_id())
                 dummy_link_start_nodes.append(dummy_link_start_node)
                 predecessors.difference_update(dummy_link_start_node)
             if not predecessors:
                 break
 
+        # find existing subsets
         for subset in Network.power_subset(list(predecessors)):
             if subset in self.node_lut:
+                if not tie_node:
+                    tie_node = Node(self.allocate_node_id())
                 dummy_link_start_nodes.append(subset)
                 predecessors.difference_update(subset)
             if not predecessors:
@@ -330,23 +339,15 @@ class Network:
 
         dummy_link_start_nodes = self.minimal_viable_list(dummy_link_start_nodes)
 
-        if direct_link_start_node:
-            linked_start_node: Set[int] = direct_link_start_node
-            for start_node in dummy_link_start_nodes:
-                linked_start_node = self.create_dummy_activity(
-                    self.node_lut[start_node],
-                    self.node_lut[direct_link_start_node],
-                )
-            if linked_start_node:
-                self.attach_activity(activity, self.node_lut[linked_start_node])
-        elif dummy_link_start_nodes:
-            floating_node = Node(self.allocate_node_id())
-            for start_node in dummy_link_start_nodes:
-                self.create_dummy_activity(self.node_lut[start_node], floating_node)
+        if not tie_node:
+            tie_node = self.start_node
 
-            self.attach_activity(activity, floating_node)
-        else:
-            self.attach_activity(activity, self.start_node)
+        for node in dummy_link_start_nodes:
+            self.create_dummy_activity(
+                self.node_lut[node],
+                tie_node,
+            )
+        self.attach_activity(activity, tie_node)
 
     def minimal_viable_list(self, los: List[Set[int]]) -> List[Set[int]]:
         los = sorted(los, key=lambda x: len(x))
@@ -534,8 +535,8 @@ if __name__ == "__main__":
     FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
     logging.basicConfig(format=FORMAT)
     logger.setLevel(logging.DEBUG)
-    # main(Path("AoA.yaml"))
+    main(Path("AoA.yaml"))
     # main(Path("tricky.yaml"))
-    main(Path("more_tricky.yaml"))
+    # main(Path("more_tricky.yaml"))
     # main(Path("test_case_3.yaml"))
     # main(Path("test_case_4.yaml"))
