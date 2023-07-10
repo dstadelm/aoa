@@ -309,19 +309,15 @@ class Network:
 
     def allocate_activity(self, activity: Activity) -> None:
         predecessors = activity.predecessors.copy()
-        tie_node: Optional[Node] = None
 
         # if it exists find the node to which all predecessors can be bound
         if tie_node_id := self.create_start_node(predecessors.copy()):
             predecessors.difference_update(tie_node_id)
-            tie_node = self.node_lut[tie_node_id]
 
         dummy_link_start_nodes: List[Set[int]] = list()
         # find subsets that can be created from existing sub-subsets
         for subset in Network.power_subset(list(predecessors))[1:]:
             if dummy_link_start_node := self.create_start_node(predecessors.copy()):
-                if not tie_node:
-                    tie_node = Node(self.allocate_node_id())
                 dummy_link_start_nodes.append(dummy_link_start_node)
                 predecessors.difference_update(dummy_link_start_node)
             if not predecessors:
@@ -330,8 +326,6 @@ class Network:
         # find existing subsets
         for subset in Network.power_subset(list(predecessors)):
             if subset in self.node_lut:
-                if not tie_node:
-                    tie_node = Node(self.allocate_node_id())
                 dummy_link_start_nodes.append(subset)
                 predecessors.difference_update(subset)
             if not predecessors:
@@ -339,8 +333,13 @@ class Network:
 
         dummy_link_start_nodes = self.minimal_viable_list(dummy_link_start_nodes)
 
-        if not tie_node:
-            tie_node = self.start_node
+        tie_node = (
+            self.node_lut[tie_node_id]
+            if tie_node_id
+            else Node(self.allocate_node_id())  # floating node
+            if dummy_link_start_nodes
+            else self.start_node
+        )
 
         for node in dummy_link_start_nodes:
             self.create_dummy_activity(
