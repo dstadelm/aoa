@@ -152,28 +152,29 @@ class Network:
     def get_allocation_sequence(
         self, activities: List[Activity], allocated_activities: List[Activity], allocated_ids: Set[int]
     ) -> List[Activity]:
-        if activities:
-            allocateable_activities = []
-            allocateable_activity_ids: List[Set[int]] = list()
-            unallocateable_activities = []
-
-            for activity in activities:
-                if activity.predecessors.issubset(allocated_ids):
-                    allocateable_activities.append(activity)
-                    allocateable_activity_ids.append({activity.id})
-                else:
-                    unallocateable_activities.append(activity)
-
-            sorted_allocateable_activies = sorted(allocateable_activities, key=lambda x: len(x.predecessors))
-            if len(activities) == unallocateable_activities:
-                raise Exception("Unable to find allocation sequence")
-            return self.get_allocation_sequence(
-                unallocateable_activities,
-                allocated_activities + sorted_allocateable_activies,
-                allocated_ids.union(*allocateable_activity_ids),
-            )
-        else:
+        if not activities:
             return allocated_activities
+
+        allocateable_activities = []
+        allocateable_activity_ids: List[Set[int]] = list()
+        unallocateable_activities = []
+
+        for activity in activities:
+            if activity.predecessors.issubset(allocated_ids):
+                allocateable_activities.append(activity)
+                allocateable_activity_ids.append({activity.id})
+            else:
+                unallocateable_activities.append(activity)
+
+        sorted_allocateable_activies = sorted(allocateable_activities, key=lambda x: len(x.predecessors))
+        if len(activities) == len(unallocateable_activities):
+            raise Exception("Unable to find allocation sequence")
+
+        return self.get_allocation_sequence(
+            unallocateable_activities,
+            allocated_activities + sorted_allocateable_activies,
+            allocated_ids.union(*allocateable_activity_ids),
+        )
 
     def calculate_latest_start(self) -> None:
         nodes = self.get_node_list_sorted_by_depth()
