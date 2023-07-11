@@ -158,10 +158,7 @@ class Network:
             unallocateable_activities = []
 
             for activity in activities:
-                if not activity.predecessors:
-                    allocateable_activities.append(activity)
-                    allocateable_activity_ids.append({activity.id})
-                elif activity.predecessors.issubset(allocated_ids):
+                if activity.predecessors.issubset(allocated_ids):
                     allocateable_activities.append(activity)
                     allocateable_activity_ids.append({activity.id})
                 else:
