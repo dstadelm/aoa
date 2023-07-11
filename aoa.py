@@ -280,29 +280,35 @@ class Network:
         end_node.earliest_start = max([start_node.earliest_start, end_node.earliest_start])
 
         if end_node.start_dependencies in self.node_lut:
+            # Only delete the entry if it references this end_node
+            # For building nodes a node with this can already exist, and that node shall not be deleted
             if self.node_lut[end_node.start_dependencies].id == end_node.id:
                 self.node_lut.pop(end_node.start_dependencies)
 
         end_node.start_dependencies = end_node.start_dependencies.union(start_node.start_dependencies)
 
+        # When building a new floating node we will create temporary node ids which already exist
         if end_node.start_dependencies not in self.node_lut:
             self.node_lut[end_node.start_dependencies] = end_node
 
         return end_node.start_dependencies
 
-    def create_start_node(self, predecessors: Set[int]) -> Optional[Set[int]]:
-        if predecessors in self.node_lut:
+    def find_mergable_subset_for_set(self, id_set: Set[int]) -> Optional[Set[int]]:
+        subset = self.find_tieable_node_for_set(id_set)
+        return subset if subset and len(subset) > 1 else None
+
+    def find_tieable_node_for_set(self, predecessors: Set[int]) -> Optional[Set[int]]:
+        if not predecessors or predecessors in self.node_lut:
             return predecessors
 
         mutable_node_id = predecessors.copy()
-        for pred_sets in self.get_sets_that_contain_ids_in_set(predecessors):
-            if not predecessors.issubset(pred_sets):
-                mutable_node_id.difference_update(pred_sets)
+        for pred_set in self.get_sets_that_contain_ids_in_set(predecessors):
+            if not predecessors.issubset(pred_set):
+                mutable_node_id.difference_update(pred_set)
             if not mutable_node_id:
                 return None
 
         if mutable_node_id:
-            self.merge_subset(mutable_node_id)
             return mutable_node_id
         else:
             return None
@@ -310,28 +316,28 @@ class Network:
     def allocate_activity(self, activity: Activity) -> None:
         predecessors = activity.predecessors.copy()
 
+        def update_predecessors(node_id):
+            predecessors.difference_update(node_id)
+            return node_id
+
         # if it exists find the node to which all predecessors can be bound
-        if tie_node_id := self.create_start_node(predecessors.copy()):
+        if tie_node_id := self.find_tieable_node_for_set(predecessors.copy()):
+            self.merge_subset(tie_node_id)
             predecessors.difference_update(tie_node_id)
 
-        dummy_link_start_nodes: List[Set[int]] = list()
         # find subsets that can be created from existing sub-subsets
-        for subset in Network.power_subset(list(predecessors))[1:]:
-            if dummy_link_start_node := self.create_start_node(predecessors.copy()):
-                dummy_link_start_nodes.append(dummy_link_start_node)
-                predecessors.difference_update(dummy_link_start_node)
-            if not predecessors:
-                break
+        mergeable_nodes = [
+            update_predecessors(node_id)
+            for subset in Network.power_subset(list(predecessors))
+            if (node_id := self.find_mergable_subset_for_set(subset))
+        ]
 
-        # find existing subsets
-        for subset in Network.power_subset(list(predecessors)):
-            if subset in self.node_lut:
-                dummy_link_start_nodes.append(subset)
-                predecessors.difference_update(subset)
-            if not predecessors:
-                break
+        for node in mergeable_nodes:
+            self.merge_subset(node)
 
-        dummy_link_start_nodes = self.minimal_viable_list(dummy_link_start_nodes)
+        remaining_nodes = [subset for subset in Network.power_subset(list(predecessors)) if subset in self.node_lut]
+
+        dummy_link_start_nodes = self.minimal_viable_list(mergeable_nodes + remaining_nodes)
 
         tie_node = (
             self.node_lut[tie_node_id]
@@ -348,18 +354,18 @@ class Network:
             )
         self.attach_activity(activity, tie_node)
 
-    def minimal_viable_list(self, los: List[Set[int]]) -> List[Set[int]]:
-        los = sorted(los, key=lambda x: len(x))
-        return self.mvl_recursion(los, [])
+    def minimal_viable_list(self, list_of_sets: List[Set[int]]) -> List[Set[int]]:
+        list_of_sets = sorted(list_of_sets, key=lambda x: len(x))
+        return self.minimal_viable_list_recursion(list_of_sets, [])
 
-    def mvl_recursion(self, start: List[Set[int]], result: List[Set[int]]) -> List[Set[int]]:
+    def minimal_viable_list_recursion(self, start: List[Set[int]], result: List[Set[int]]) -> List[Set[int]]:
         if not start:
             return result
         result_union = self.get_union(result)
         target = result_union.union(self.get_union(start))
         if result_union.union(self.get_union(start[1:])) != target:
             result.append(start[0])
-        return self.mvl_recursion(start[1:], result)
+        return self.minimal_viable_list_recursion(start[1:], result)
 
     def get_union(self, list_of_sets: List[Set[int]]) -> Set[int]:
         if list_of_sets:
@@ -384,21 +390,15 @@ class Network:
         4. if len of orig subset > 0 goto 1
         """
         activity_ids_to_link: List[Set[int]] = []
-        mutable_merge_set = list(merge_set)
+        mutable_merge_set = merge_set.copy()
         while mutable_merge_set:
-            for subset in Network.power_subset(mutable_merge_set):
+            for subset in Network.power_subset(list(mutable_merge_set)):
                 if set(subset) in self.node_lut:
                     activity_ids_to_link.append(set(subset))
-                    for item in subset:
-                        mutable_merge_set.remove(item)
+                    mutable_merge_set.difference_update(subset)
                     break
 
         self.recursive_merge(activity_ids_to_link[0], activity_ids_to_link[1:])
-
-    def have_common_ancestor(self, node_left: Node, node_right: Node) -> bool:
-        ids_left = {activity.start_node.id for activity in node_left.inbound_activities}
-        ids_right = {activity.start_node.id for activity in node_right.inbound_activities}
-        return True if ids_left.intersection(ids_right) else False
 
     def recursive_merge(self, head: Set[int], tail: List[Set[int]]) -> None:
         new_head: Set[int] = set()
@@ -415,6 +415,11 @@ class Network:
                 self.node_lut.pop(head)
 
             self.recursive_merge(new_head, tail[1:])
+
+    def have_common_ancestor(self, node_left: Node, node_right: Node) -> bool:
+        ids_left = {activity.start_node.id for activity in node_left.inbound_activities}
+        ids_right = {activity.start_node.id for activity in node_right.inbound_activities}
+        return True if ids_left.intersection(ids_right) else False
 
 
 @dataclass
@@ -538,4 +543,4 @@ if __name__ == "__main__":
     # main(Path("tricky.yaml"))
     # main(Path("more_tricky.yaml"))
     # main(Path("test_case_3.yaml"))
-    # main(Path("test_case_4.yaml"))
+    # main(Path("test_case_5.yaml"))
