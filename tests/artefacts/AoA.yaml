@@ -1,0 +1,24 @@
+Formatting:
+  zf: blue
+  unknown: grey
+  scs: red
+  dc: green
+  critical path: red
+Resources:
+  - {Id: DST, Name: "David Stadelmann", Weekdays: "1110100", Pensum: 0.7, Holidays: []}
+Activities:
+  - {Id: 1, Activity: define topp level requirements, Effort: 10, Owner: zf, Resource: DST}
+  - {Id: 2, Activity: setup organisation tools, Effort: 2, Owner: unknown, Resource: DST}
+  - {Id: 3, Activity: analyse memory requirements, Effort: 15, Owner: scs, Resource: DST}
+  - {Id: 4, Predecessors: [1, 2, 3], Activity: define access points (dsp to radar ip), Effort: 5, Owner: zf, Resource: DST}
+  - {Id: 5, Predecessors: [1, 2, 3], Activity: define required FFTs, Effort: 10, Owner: zf, Resource: DST}
+  - {Id: 6, Predecessors: [1, 2, 3], Activity: define FuSa startegy, Effort: 5, Owner: dc, Resource: DST}
+  - {Id: 7, Predecessors: [1, 2, 3], Activity: define HIL strategy, Effort: 5, Owner: zf, Resource: DST}
+  - {Id: 8, Predecessors: [4, 5], Activity: analyse dsp performance, Effort: 5, Owner: unknown, Resource: DST}
+  - {Id: 9, Predecessors: [8], Activity: dsp assessement, Effort: 5, Owner: unknown, Resource: DST}
+  - {Id: 10, Predecessors: [5], Activity: define arch of FFTs, Effort: 10, Owner: scs, Resource: DST}
+  - {Id: 11, Predecessors: [6], Activity: analyse FuSa implications on arch, Effort: 5, Owner: scs, Resource: DST}
+  - {Id: 12, Predecessors: [7], Activity: analyse HIL implications on arch, Effort: 5, Owner: scs, Resource: DST}
+  - {Id: 13, Predecessors: [10, 11, 12], Activity: define required changes, Effort: 5, Owner: scs, Resource: DST}
+  - {Id: 14, Predecessors: [13], Activity: transition unchaged code to ASIC, Effort: 30, Owner: dc, Resource: DST}
+  - {Id: 15, Predecessors: [13], Activity: implement required changes, Effort: 40, Owner: scs, Resource: DST}

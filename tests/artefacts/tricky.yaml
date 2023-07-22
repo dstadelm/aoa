@@ -1,0 +1,7 @@
+Activities:
+  - {Id: 1, Activity: A, Effort: 5, Owner: zf, Ressource: dummy}
+  - {Id: 2, Activity: B, Effort: 5, Owner: unknown, Ressource: dummy}
+  - {Id: 3, Activity: C, Effort: 5, Owner: scs, Ressource: dummy}
+  - {Id: 4, Predecessors: [1, 2, 3], Activity: D, Effort: 5, Owner: zf, Ressource: dummy}
+  - {Id: 5, Predecessors: [2, 3], Activity: E, Effort: 5, Owner: zf, Ressource: dummy}
+  - {Id: 6, Predecessors: [1, 2], Activity: F, Effort: 5, Owner: dc, Ressource: dummy}
