@@ -1,3 +1,25 @@
 [tool.black]
 line-length=120
 
+[tool.poetry]
+name = "aoa"
+version = "0.1.0"
+description = "Create activity on arrow diagrams from yaml input"
+authors = ["David Stadelmann <david.stadelmann@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.7.0"
+isort = "^5.12.0"
+debugpy = "^1.6.7.post1"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.4.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
