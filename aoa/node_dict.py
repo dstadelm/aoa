@@ -34,7 +34,7 @@ class NodeDict(dict):
         for k in super().keys():
             yield self.to_set(k)
 
-    def values(self) -> Generator[Union[Activity, DummyActivity], Any, Any]:
+    def values(self) -> Generator[Node, Any, Any]:
         for v in super().values():
             yield v
 
