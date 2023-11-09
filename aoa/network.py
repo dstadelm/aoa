@@ -10,11 +10,6 @@ from node_dict import NodeDict
 
 
 class Network:
-    @classmethod
-    def power_subset(cls, predecessors: List[int]) -> List[Set[int]]:
-        powersets = [set(x) for x in list(powerset(predecessors))]
-        return sorted(powersets, key=lambda x: len(x), reverse=True)
-
     def __init__(self, activities: List[Activity]):
         self.largest_node_id = -1
         self.node_lut: NodeDict = NodeDict()
@@ -30,7 +25,31 @@ class Network:
         self.renumber_nodes()
         self.calculate_latest_start()
 
+    @classmethod
+    def power_subset(cls, predecessors: List[int]) -> List[Set[int]]:
+        """
+        For a list of values returns all possible power sets from largest to smallest
+        Example:
+        >>> Network.power_subset([1, 2, 3])
+        [{1, 2, 3}, {1, 2}, {1, 3}, {2, 3}, {1}, {2}, {3}, set()]
+        """
+        powersets = [set(x) for x in list(powerset(predecessors))]
+        return sorted(powersets, key=lambda x: len(x), reverse=True)
+
     def get_sets_that_contain_ids_in_set(self, id_set: Set[int]) -> List[Set[int]]:
+        """
+        For a given set of ids returns all all sets that contain that ids
+        Where a set is a group of activities which are together the predecessors of an activity
+
+        Example:
+
+        Activity 4 has predecessors 1, 2 and 3
+        Activity 5 has predecessors 1, 2
+
+        So for Activity 2 the sets in which it exists are {1, 2, 3} and {1, 2}
+        """
+
+        # create cached entry
         if not self.reverse_predecessor_lut:
             for activity in self.activities:
                 for id in activity.predecessors:
@@ -41,6 +60,11 @@ class Network:
     def get_allocation_sequence(
         self, activities: List[Activity], allocated_activities: List[Activity], allocated_ids: Set[int]
     ) -> List[Activity]:
+        """
+        Recursive Function to determine a sequence in which the activities can be allocated.
+        An activity can be allocated, when all activities which the activity depends on have been allocated.
+        Returns a list of activities in the order of allocation of the activities
+        """
         if not activities:
             return allocated_activities
 
@@ -66,6 +90,9 @@ class Network:
         )
 
     def calculate_latest_start(self) -> None:
+        """
+        Iterate over all nodes and determine the latest possible start
+        """
         nodes = self.get_node_list_sorted_by_depth()
         nodes_reversed = [nodes[i] for i in range(len(nodes) - 1, -1, -1)]
         for node in nodes_reversed:
@@ -90,6 +117,9 @@ class Network:
                     activity.free_float = activity.end_node.earliest_start - activity.duration - node.earliest_start
 
     def get_node_list_sorted_by_depth(self) -> List[Node]:
+        """
+        Iterate over all nodes and sort them by depth (depth of the graph from the root)
+        """
         nodes = [self.start_node]
         nodes += list(sorted(self.node_lut.values(), key=lambda x: x.id))
         return nodes
@@ -104,6 +134,13 @@ class Network:
         return nodes
 
     def renumber_nodes(self) -> None:
+        """
+        Renumber nodes to have a consecutive numbering for the nodes
+
+        During the generation of the nodes some nodes can be tied together resulting in nodes getting dropped, therefore
+        the numbering is in order but there might be blanks. This method renumbers all nodes in sequential manner
+        without changing their order.
+        """
         if not self.end_node:
             raise Exception("Undefined end_node")
 
@@ -117,6 +154,11 @@ class Network:
             node.id = index
 
     def tie_end_node(self) -> None:
+        """
+        Ties leaf nodes to one end node
+
+        The algorithm leaves end nodes as they are. This function ties them to one common end node.
+        """
         end_nodes: NodeDict = NodeDict()
         tie_node: Node = Node(-1)
         max_depth: int = -1
@@ -142,10 +184,22 @@ class Network:
         self.end_node = tie_node
 
     def allocate_node_id(self) -> int:
+        """
+        Creates a new node id based on the existing largest node id
+        """
         self.largest_node_id += 1
         return self.largest_node_id
 
     def attach_activity(self, activity: Activity, start_node: Node) -> Activity:
+        """
+        Attach an activity to given start node and create an end node.
+
+        * The outbound activities of the start node are updated.
+        * The earliest start of the end node is set.
+        * The activity is added to the inbound activities of the end node
+        * The start and end node are added to the activity
+        * The node lookup table is updated with the new activity
+        """
         end_node = Node(self.allocate_node_id(), max_depth=start_node.max_depth + 1)
         start_node.outbound_activities.append(activity)
         end_node.inbound_activities.append(activity)
@@ -160,6 +214,9 @@ class Network:
             start_node=start_node,
             end_node=end_node,
         )
+        """
+        Add an dummy node between a start and end node
+        """
         start_node.outbound_activities.append(dummy_activity)
         end_node.inbound_activities.append(dummy_activity)
 
@@ -270,7 +327,7 @@ class Network:
 
     def merge_subset(self, merge_set: Set[int]) -> None:
         """
-        As subsets of the to be merged subset could potentially allready have been merged the following steps are required
+        As subsets of the to be merged subset could potentially already have been merged the following steps are required
         1. go through each subset of the subset and check if there is a activity with that id
         2. if activity with such an id exists add the activity id to the list of activity ids to link
         3. remove vitual node subset from orig subset
