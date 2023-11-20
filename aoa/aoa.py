@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import yaml
+from activity import Activity
 from network import Network
-from node import Activity
 from plantuml import PlantUml
 
 YamlActivity = Dict[str, Any]

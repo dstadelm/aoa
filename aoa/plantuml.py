@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Union
 
-from node import Activity, DummyActivity
+from activity import Activity, DummyActivity
 from network import Network
 
 
@@ -9,6 +9,7 @@ class PlantUml:
     def __init__(self, network: Network):
         self.plantuml: str = ""
         self.sorted_nodes = network.get_node_list_sorted_by_depth()
+        self.activity_node_lut = network._activities
 
     def get_txt(self) -> str:
         return self._get_header() + self._get_map() + "\n" + self._get_network() + self._get_trailer()
@@ -41,9 +42,9 @@ title Pert: Project Design
 
     def _get_network(self) -> str:
         network = [
-            f"{activity.start_node.id} -{self._line_fmt(activity)}-> {activity.end_node.id} : {activity.description} (Id={activity.id}, D={activity.duration}, TF={activity.total_float}, FF={activity.free_float})"
+            f"{self.activity_node_lut[activity.id].start_node.id} -{self._line_fmt(activity)}-> {self.activity_node_lut[activity.id].end_node.id} : {activity.description} (Id={activity.id}, D={activity.duration}, TF={activity.total_float}, FF={activity.free_float})"
             if type(activity) == Activity
-            else f"{activity.start_node.id} -{self._line_fmt(activity)}-> {activity.end_node.id}"
+            else f"{self.activity_node_lut[activity.id].start_node.id} -{self._line_fmt(activity)}-> {self.activity_node_lut[activity.id].end_node.id}"
             for node in self.sorted_nodes
             for activity in node.outbound_activities
         ]
@@ -57,7 +58,10 @@ title Pert: Project Design
             else:
                 return ""
         if type(activity) == DummyActivity:
-            if activity.start_node.earliest_start == activity.end_node.latest_start:
+            if (
+                self.activity_node_lut[activity.id].start_node.earliest_start
+                == self.activity_node_lut[activity.id].end_node.latest_start
+            ):
                 return "[dashed,thickness=4]"
             else:
                 return "[dashed]"

@@ -1,6 +1,6 @@
-from typing import Any, Generator, Set, Tuple, Union
+from typing import Any, Generator, Set, Tuple
 
-from node import Activity, DummyActivity, Node
+from node import Node
 
 
 class NodeDict(dict):

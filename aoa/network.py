@@ -2,11 +2,19 @@
 from __future__ import annotations
 
 import copy
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import Dict, Generator, List, Optional, Set
 
+from activity import Activity, DummyActivity
 from more_itertools import powerset
-from node import Activity, DummyActivity, Node
+from node import Node
 from node_dict import NodeDict
+
+
+@dataclass
+class ActivityNodeLut:
+    start_node: Node
+    end_node: Node
 
 
 class Network:
@@ -15,6 +23,10 @@ class Network:
         self.node_lut: NodeDict = NodeDict()
         self.reverse_predecessor_lut: Dict[int, List[Set[int]]] = dict()
         self.activities = copy.deepcopy(activities)
+        self.dummy_activity_id = self.dummy_activity_id_generator()
+
+        self._activities: dict[int, ActivityNodeLut] = dict()
+
         self.start_node: Node = Node(self.allocate_node_id())
         self.end_node: Optional[Node] = None
 
@@ -113,12 +125,12 @@ class Network:
         reversed_nodes = [nodes_sorted_by_depth[i] for i in range(len(nodes_sorted_by_depth) - 1, -1, -1)]
         for node in reversed_nodes:
             latest_starts = [
-                activity.end_node.latest_start - activity.duration
+                self._activities[activity.id].end_node.latest_start - activity.duration
                 for activity in node.outbound_activities
                 if type(activity) == Activity
             ]
             latest_starts += [
-                activity.end_node.latest_start
+                self._activities[activity.id].end_node.latest_start
                 for activity in node.outbound_activities
                 if type(activity) == DummyActivity
             ]
@@ -129,8 +141,12 @@ class Network:
 
             for activity in node.outbound_activities:
                 if type(activity) == Activity:
-                    activity.total_float = activity.end_node.latest_start - activity.duration - node.earliest_start
-                    activity.free_float = activity.end_node.earliest_start - activity.duration - node.earliest_start
+                    activity.total_float = (
+                        self._activities[activity.id].end_node.latest_start - activity.duration - node.earliest_start
+                    )
+                    activity.free_float = (
+                        self._activities[activity.id].end_node.earliest_start - activity.duration - node.earliest_start
+                    )
 
     def get_node_list_sorted_by_depth(self) -> List[Node]:
         """Iterate over all nodes and sort them by depth (depth of the graph from the root).
@@ -193,7 +209,7 @@ class Network:
             else:
                 for activity in node.inbound_activities:
                     tie_node.inbound_activities.append(activity)
-                    activity.end_node = tie_node
+                    self._activities[activity.id].end_node = tie_node
                 if node.id != 0:
                     self.node_lut.pop(node.start_dependencies)
 
@@ -203,6 +219,12 @@ class Network:
         """Creates a new node id based on the existing largest node id"""
         self.largest_node_id += 1
         return self.largest_node_id
+
+    def dummy_activity_id_generator(self) -> Generator[int, None, None]:
+        id = -1
+        while True:
+            yield id
+            id -= 1
 
     def attach_activity(self, activity: Activity, start_node: Node) -> Activity:
         """Attach an activity to given start node and create an end node.
@@ -221,16 +243,12 @@ class Network:
         start_node.outbound_activities.append(activity)
         end_node.inbound_activities.append(activity)
         end_node.earliest_start = start_node.earliest_start + activity.duration
-        activity.end_node = end_node
-        activity.start_node = start_node
-        self.node_lut[{activity.id}] = activity.end_node
+        self._activities[activity.id] = ActivityNodeLut(start_node, end_node)
+        self.node_lut[{activity.id}] = end_node
         return activity
 
     def create_dummy_activity(self, start_node: Node, end_node: Node) -> Set[int]:
-        dummy_activity = DummyActivity(
-            start_node=start_node,
-            end_node=end_node,
-        )
+        dummy_activity = DummyActivity(next(self.dummy_activity_id))
         """Add an dummy node between a start and end node.
 
         Arguments:
@@ -258,6 +276,7 @@ class Network:
         if end_node.start_dependencies not in self.node_lut:
             self.node_lut[end_node.start_dependencies] = end_node
 
+        self._activities[dummy_activity.id] = ActivityNodeLut(start_node, end_node)
         return end_node.start_dependencies
 
     def find_mergable_subset_for_set(self, id_set: Set[int]) -> Optional[Set[int]]:
@@ -401,7 +420,7 @@ class Network:
                 new_head = self.create_dummy_activity(self.node_lut[tail[0]], self.node_lut[head])
             else:
                 for activity in self.node_lut[tail[0]].inbound_activities:
-                    activity.end_node = self.node_lut[head]
+                    self._activities[activity.id].end_node = self.node_lut[head]
                     self.node_lut[head].inbound_activities.append(activity)
                 new_head = head.union(tail[0])
                 self.node_lut[new_head] = self.node_lut[head]
@@ -411,6 +430,6 @@ class Network:
             self.recursive_merge(new_head, tail[1:])
 
     def have_common_ancestor(self, node_left: Node, node_right: Node) -> bool:
-        ids_left = {activity.start_node.id for activity in node_left.inbound_activities}
-        ids_right = {activity.start_node.id for activity in node_right.inbound_activities}
+        ids_left = {self._activities[activity.id].start_node.id for activity in node_left.inbound_activities}
+        ids_right = {self._activities[activity.id].start_node.id for activity in node_right.inbound_activities}
         return True if ids_left.intersection(ids_right) else False
