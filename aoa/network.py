@@ -20,7 +20,6 @@ class ActivityNodeLut:
 class Network:
     def __init__(self, activities: List[Activity]):
         self.node_lut: NodeDict = NodeDict()
-        self.reverse_predecessor_lut: Dict[int, List[Set[int]]] = dict()
         self.activities = copy.deepcopy(activities)
 
         self._activities: dict[int, ActivityNodeLut] = dict()
@@ -71,13 +70,18 @@ class Network:
             So for Activity 2 the sets in which it exists are {1, 2, 3} and {1, 2}
         """
 
-        # create cached entry
-        if not self.reverse_predecessor_lut:
+        if not hasattr(Network.get_sets_that_contain_ids_in_set, "reverse_predecessor_lut"):
+            Network.get_sets_that_contain_ids_in_set.reverse_predecessor_lut = dict()
+            # create cached entry
             for activity in self.activities:
                 for id in activity.predecessors:
-                    self.reverse_predecessor_lut.setdefault(id, []).append(activity.predecessors)
+                    Network.get_sets_that_contain_ids_in_set.reverse_predecessor_lut.setdefault(id, []).append(
+                        activity.predecessors
+                    )
 
-        return [subset for id in id_set for subset in self.reverse_predecessor_lut[id]]
+        return [
+            subset for id in id_set for subset in Network.get_sets_that_contain_ids_in_set.reverse_predecessor_lut[id]
+        ]
 
     def get_allocation_sequence(
         self, activities: List[Activity], allocated_activities: List[Activity], allocated_ids: Set[int]
