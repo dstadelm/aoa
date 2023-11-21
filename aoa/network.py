@@ -19,11 +19,9 @@ class ActivityNodeLut:
 
 class Network:
     def __init__(self, activities: List[Activity]):
-        self.largest_node_id = -1
         self.node_lut: NodeDict = NodeDict()
         self.reverse_predecessor_lut: Dict[int, List[Set[int]]] = dict()
         self.activities = copy.deepcopy(activities)
-        self.dummy_activity_id = self.dummy_activity_id_generator()
 
         self._activities: dict[int, ActivityNodeLut] = dict()
 
@@ -217,14 +215,16 @@ class Network:
 
     def allocate_node_id(self) -> int:
         """Creates a new node id based on the existing largest node id"""
-        self.largest_node_id += 1
-        return self.largest_node_id
+        if not hasattr(Network.allocate_node_id, "id"):
+            Network.allocate_node_id.id = -1
+        Network.allocate_node_id.id += 1
+        return Network.allocate_node_id.id
 
-    def dummy_activity_id_generator(self) -> Generator[int, None, None]:
-        id = -1
-        while True:
-            yield id
-            id -= 1
+    def dummy_activity_id_generator(self) -> int:
+        if not hasattr(Network.dummy_activity_id_generator, "id"):
+            Network.dummy_activity_id_generator.id = 0
+        Network.dummy_activity_id_generator.id -= 1
+        return Network.dummy_activity_id_generator.id
 
     def attach_activity(self, activity: Activity, start_node: Node) -> Activity:
         """Attach an activity to given start node and create an end node.
@@ -248,7 +248,7 @@ class Network:
         return activity
 
     def create_dummy_activity(self, start_node: Node, end_node: Node) -> Set[int]:
-        dummy_activity = DummyActivity(next(self.dummy_activity_id))
+        dummy_activity = DummyActivity(self.dummy_activity_id_generator())
         """Add an dummy node between a start and end node.
 
         Arguments:
