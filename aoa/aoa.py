@@ -60,7 +60,7 @@ def main(file: Path) -> None:
     network = Network(get_activities(project))
     plantuml = PlantUml(network)
     # print(plantuml.get_txt())
-    plantuml.write_txt(file.with_suffix(".txt"))
+    plantuml.write_txt(file.with_suffix(".md"))
 
 
 def get_activities(project: Dict[str, Any]) -> List[Activity]:

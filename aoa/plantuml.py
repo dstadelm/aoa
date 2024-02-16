@@ -19,8 +19,9 @@ class PlantUml:
             f.write(self.get_txt())
 
     def _get_header(self) -> str:
-        return """@startuml PERT
-left to right direction
+        return """``` plantuml
+@startuml PERT
+top to bottom direction
 ' Horizontal lines: -->, <--, <-->
 ' Vertical lines: ->, <-, <->
 title Pert: Project Design
@@ -28,7 +29,7 @@ title Pert: Project Design
 """
 
     def _get_trailer(self) -> str:
-        return "\n@enduml"
+        return "\n@enduml\n```"
 
     def _get_map(self) -> str:
         map_list = [
