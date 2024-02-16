@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Dict, Generator, List, Optional, Set
+from typing import List, Optional, Set
 
+import networkx as nx
 from activity import Activity, DummyActivity
 from more_itertools import powerset
 from node import Node
@@ -17,14 +18,26 @@ class ActivityNodeLut:
     end_node: Node
 
 
+def to_key(id_set: Set[int]) -> str:
+    return "-".join(map(str, sorted(id_set)))
+
+
+def to_set(id: str) -> Set[int]:
+    return set([int(i) for i in id.split("-")])
+
+
 class Network:
     def __init__(self, activities: List[Activity]):
+        self.graph = nx.DiGraph()
+        key = to_key({self.next_node_id()})
+        self.graph.add_node(key)
+
         self.node_lut: NodeDict = NodeDict()
         self.activities = copy.deepcopy(activities)
 
         self._activities: dict[int, ActivityNodeLut] = dict()
 
-        self.start_node: Node = Node(self.allocate_node_id())
+        self.start_node: Node = Node(str(self.allocate_node_id()))
         self.end_node: Optional[Node] = None
 
         allocation_sequence = self.get_allocation_sequence(activities, list(), set())
@@ -160,15 +173,6 @@ class Network:
         nodes += list(sorted(self.node_lut.values(), key=lambda x: x.id))
         return nodes
 
-    def __repr__(self) -> str:
-        nodes = "Nodes key, node id:\n"
-        for key, node in self.node_lut.items():
-            nodes += f"{key} => {node.id}\n"
-            for activity in node.inbound_activities:
-                nodes += activity.__repr__()
-                nodes += "\n"
-        return nodes
-
     def _renumber_nodes(self) -> None:
         """Renumber nodes to have a consecutive numbering for the nodes.
 
@@ -186,7 +190,7 @@ class Network:
         sorted_nodes.append(self.end_node)
 
         for index, node in enumerate(sorted_nodes):
-            node.id = index
+            node.id = str(index)
 
     def _tie_end_node(self) -> None:
         """Ties leaf nodes to one end node.
@@ -194,8 +198,10 @@ class Network:
         The algorithm for allocating nodes leaves end nodes as they are. This function ties them to one common end node.
         """
         end_nodes: NodeDict = NodeDict()
-        tie_node: Node = Node(-1)
-        max_depth: int = -1
+        end_node = {self.allocate_node_id()}
+        for node in self.graph.nodes:
+            if not list(self.graph.out_edges(node)):
+                self.merge_nodes(end_node, node)
         for id, node in self.node_lut.items():
             if not node.outbound_activities:
                 end_nodes[id] = node
@@ -206,7 +212,7 @@ class Network:
         del end_nodes[tie_node.start_dependencies]
 
         for id, node in end_nodes.items():
-            if self.have_common_ancestor(node, tie_node):
+            if self.have_common_ancestor(to_set(node.id), to_set(tie_node.id)):
                 self.create_dummy_activity(node, tie_node)
             else:
                 for activity in node.inbound_activities:
@@ -216,6 +222,16 @@ class Network:
                     self.node_lut.pop(node.start_dependencies)
 
         self.end_node = tie_node
+
+    def has_node(self, s: set[int]) -> bool:
+        return self.graph.has_node(to_key(s))
+
+    def next_node_id(self) -> int:
+        """Creates a new node id based on the existing largest node id"""
+        if not hasattr(Network.next_node_id, "id"):
+            Network.next_node_id.id = -1
+        Network.next_node_id.id += 1
+        return Network.next_node_id.id
 
     def allocate_node_id(self) -> int:
         """Creates a new node id based on the existing largest node id"""
@@ -230,58 +246,18 @@ class Network:
         Network.dummy_activity_id_generator.id -= 1
         return Network.dummy_activity_id_generator.id
 
-    def attach_activity(self, activity: Activity, start_node: Node) -> Activity:
-        """Attach an activity to given start node and create an end node.
-
-        * The outbound activities of the start node are updated.
-        * The earliest start of the end node is set.
-        * The activity is added to the inbound activities of the end node
-        * The start and end node are added to the activity
-        * The node lookup table is updated with the new activity
-
-        Arguments:
-            activity(Activity): The activity to attach to the start node
-            start_node(Node): The start node to which the activity is attached
-        """
-        end_node = Node(self.allocate_node_id(), max_depth=start_node.max_depth + 1)
-        start_node.outbound_activities.append(activity)
-        end_node.inbound_activities.append(activity)
-        end_node.earliest_start = start_node.earliest_start + activity.duration
-        self._activities[activity.id] = ActivityNodeLut(start_node, end_node)
-        self.node_lut[{activity.id}] = end_node
+    def attach_activity(self, activity: Activity, start_node: Set[int]):
+        end_node = str(self.allocate_node_id())
+        self.graph.add_node(end_node)
+        self.graph.add_edge(to_key(start_node), end_node, activity=activity.id)
         return activity
 
-    def create_dummy_activity(self, start_node: Node, end_node: Node) -> Set[int]:
-        dummy_activity = DummyActivity(self.dummy_activity_id_generator())
-        """Add an dummy node between a start and end node.
-
-        Arguments:
-            start_node(Node): The starting node for the dummy activity
-            end_node(Node): The ending node for the dummy activity
-
-        Returns:
-           Set[int]: The updated id of the end node
-        """
-        start_node.outbound_activities.append(dummy_activity)
-        end_node.inbound_activities.append(dummy_activity)
-
-        end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
-        end_node.earliest_start = max([start_node.earliest_start, end_node.earliest_start])
-
-        if end_node.start_dependencies in self.node_lut:
-            # Only delete the entry if it references this end_node
-            # For building nodes a node with this can already exist, and that node shall not be deleted
-            if self.node_lut[end_node.start_dependencies].id == end_node.id:
-                self.node_lut.pop(end_node.start_dependencies)
-
-        end_node.start_dependencies = end_node.start_dependencies.union(start_node.start_dependencies)
-
-        # When building a new floating node we will create temporary node ids which already exist
-        if end_node.start_dependencies not in self.node_lut:
-            self.node_lut[end_node.start_dependencies] = end_node
-
-        self._activities[dummy_activity.id] = ActivityNodeLut(start_node, end_node)
-        return end_node.start_dependencies
+    def create_dummy_activity(self, start_node: Set[int], end_node: Set[int]) -> Set[int]:
+        dummy_activity = self.dummy_activity_id_generator()
+        self.graph.add_edge(to_key(start_node), to_key(end_node), activity=dummy_activity)
+        new_id = start_node.union(end_node)
+        nx.relabel_nodes(self.graph, {to_key(end_node): to_key(new_id)})
+        return new_id
 
     def find_mergable_subset_for_set(self, id_set: Set[int]) -> Optional[Set[int]]:
         """
@@ -354,16 +330,16 @@ class Network:
         dummy_link_start_nodes = self.minimal_viable_list(mergeable_nodes + remaining_nodes)
 
         tie_node = (
-            self.node_lut[tie_node_id]
+            tie_node_id
             if tie_node_id
-            else Node(self.allocate_node_id())  # floating node
+            else {self.allocate_node_id()}  # new floating node
             if dummy_link_start_nodes
-            else self.start_node
+            else {0}  # the root node
         )
 
         for node in dummy_link_start_nodes:
             self.create_dummy_activity(
-                self.node_lut[node],
+                node,
                 tie_node,
             )
         self.attach_activity(activity, tie_node)
@@ -410,7 +386,11 @@ class Network:
         mutable_merge_set = merge_set.copy()
         while mutable_merge_set:
             for subset in Network.power_subset(list(mutable_merge_set)):
-                if set(subset) in self.node_lut:
+                # if set(subset) in self.node_lut:
+                #     activity_ids_to_link.append(set(subset))
+                #     mutable_merge_set.difference_update(subset)
+                #     break
+                if self.has_node(set(subset)):
                     activity_ids_to_link.append(set(subset))
                     mutable_merge_set.difference_update(subset)
                     break
@@ -420,20 +400,30 @@ class Network:
     def recursive_merge(self, head: Set[int], tail: List[Set[int]]) -> None:
         new_head: Set[int] = set()
         if tail:
-            if self.have_common_ancestor(self.node_lut[head], self.node_lut[tail[0]]):
-                new_head = self.create_dummy_activity(self.node_lut[tail[0]], self.node_lut[head])
+            if self.have_common_ancestor(head, tail[0]):
+                new_head = self.create_dummy_activity(tail[0], head)
             else:
-                for activity in self.node_lut[tail[0]].inbound_activities:
-                    self._activities[activity.id].end_node = self.node_lut[head]
-                    self.node_lut[head].inbound_activities.append(activity)
-                new_head = head.union(tail[0])
-                self.node_lut[new_head] = self.node_lut[head]
-                self.node_lut.pop(tail[0])
-                self.node_lut.pop(head)
+                merge_node = head.union(tail[0])
+                self.merge_nodes(merge_node, head)
+                self.merge_nodes(merge_node, tail[0])
 
             self.recursive_merge(new_head, tail[1:])
 
-    def have_common_ancestor(self, node_left: Node, node_right: Node) -> bool:
-        ids_left = {self._activities[activity.id].start_node.id for activity in node_left.inbound_activities}
-        ids_right = {self._activities[activity.id].start_node.id for activity in node_right.inbound_activities}
+    def merge_nodes(self, survivor: Set[int], loser: Set[int]):
+        survivor_key = to_key(survivor)
+        loser_key = to_key(loser)
+        if not self.graph.has_node(survivor_key):
+            self.graph.add_node(survivor_key)
+        for start, _, data in self.graph.in_edges(loser_key, data=True):
+            if data:
+                activity_id = data["activity"]
+                self._activities[activity_id].end_node = Node(survivor_key)
+                self.graph.add_edge(start, survivor_key, activity=data["activity"])
+
+        self.graph.get_edge_data
+        self.graph.remove_node(loser_key)
+
+    def have_common_ancestor(self, node_left: Set[int], node_right: Set[int]) -> bool:
+        ids_left = set(self.graph.predecessors(to_key(node_left)))
+        ids_right = set(self.graph.predecessors(to_key(node_right)))
         return True if ids_left.intersection(ids_right) else False

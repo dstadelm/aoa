@@ -102,8 +102,8 @@ if __name__ == "__main__":
     FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
     logging.basicConfig(format=FORMAT)
     logger.setLevel(logging.DEBUG)
-    main(Path("../AoA.yaml"))
+    # main(Path("../AoA.yaml"))
     # main(Path("tricky.yaml"))
-    # main(Path("more_tricky.yaml"))
+    main(Path("../more_tricky.yaml"))
     # main(Path("test_case_3.yaml"))
     # main(Path("test_case_5.yaml"))
