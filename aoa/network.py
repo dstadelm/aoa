@@ -212,9 +212,14 @@ class Network:
                 for activity in node.inbound_activities:
                     tie_node.inbound_activities.append(activity)
                     self._activities[activity.id].end_node = tie_node
+                    if isinstance(activity, Activity):
+                        earliest_start = self._activities[activity.id].start_node.earliest_start + activity.duration
+                        if tie_node.earliest_start < earliest_start:
+                            tie_node.earliest_start = earliest_start
                 if node.id != 0:
                     self.node_lut.pop(node.start_dependencies)
 
+        tie_node.latest_start = tie_node.earliest_start
         self.end_node = tie_node
 
     def allocate_node_id(self) -> int:
