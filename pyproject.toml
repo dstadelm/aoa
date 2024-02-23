@@ -10,11 +10,16 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.10,<3.11"
 flask = "^3.0.0"
-htmx = "^0.0.0"
 more-itertools = "^10.1.0"
 networkx = "^3.2.1"
+pygraphviz = "^1.12"
+matplotlib = "^3.8.3"
+pyside2 = "^5.15.2.1"
+rstcheck = "^6.2.0"
+restview = "^3.0.1"
+pyyaml = "^6.0.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.7.0"

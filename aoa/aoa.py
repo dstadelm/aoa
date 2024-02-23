@@ -8,10 +8,15 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List
 
+import pygraphviz as pgvz
 import yaml
 from activity import Activity
+from matplotlib import image as mpimg
+from matplotlib import pyplot as plt
 from network import Network
 from plantuml import PlantUml
+
+import networkx as nx
 
 YamlActivity = Dict[str, Any]
 YamlActivities = List[YamlActivity]
@@ -58,9 +63,18 @@ def main(file: Path) -> None:
     project = parse(file)
     annotate_with_duration(project)
     network = Network(get_activities(project))
-    plantuml = PlantUml(network)
-    # print(plantuml.get_txt())
-    plantuml.write_txt(file.with_suffix(".txt"))
+    gvz: pgvz.AGraph = nx.nx_agraph.to_agraph(network.graph)
+    gvz.layout(prog="dot", args="-Nshape=record")
+    # dot = gvz.string()
+    gvz.draw(file.with_suffix(".png"))
+    image = mpimg.imread(file.with_suffix(".png"))
+    plt.title(str(file.with_suffix("")))
+    plt.imshow(image)
+    plt.show()
+
+    # plantuml = PlantUml(network)
+    # # print(plantuml.get_txt())
+    # plantuml.write_txt(file.with_suffix(".txt"))
 
 
 def get_activities(project: Dict[str, Any]) -> List[Activity]:
@@ -102,8 +116,8 @@ if __name__ == "__main__":
     FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
     logging.basicConfig(format=FORMAT)
     logger.setLevel(logging.DEBUG)
-    # main(Path("../AoA.yaml"))
+    main(Path("../testsets/AoA.yaml"))
     # main(Path("tricky.yaml"))
-    main(Path("../more_tricky.yaml"))
+    # main(Path("../more_tricky.yaml"))
     # main(Path("test_case_3.yaml"))
     # main(Path("test_case_5.yaml"))
