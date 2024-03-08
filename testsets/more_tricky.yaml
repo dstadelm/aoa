@@ -1,0 +1,18 @@
+Ressource:
+  Max:
+    Workingdays: {Monday: 1.0, Tuesday: 1.0, Wednsday: 0.0, Thursday: 1.0, Friday: 0.5}
+    Effecticity: 1.2
+    Vacation:
+      - {Start: 29.6.2023, End: 23.7.2023}
+Activities:
+  - {Id: 1, Activity: A, Effort: 6, Owner: zf, Ressource: Max}
+  - {Id: 2, Activity: B, Effort: 7, Owner: unknown, Ressource: Max}
+  - {Id: 3, Activity: C, Effort: 8, Owner: scs, Ressource: Max}
+  - {Id: 4, Activity: D, Effort: 9, Owner: scs, Ressource: Max}
+  - {Id: 5, Activity: E, Effort: 10, Owner: scs, Ressource: Max}
+  - {Id: 6, Predecessors: [1, 2], Activity: F, Effort: 5, Owner: zf, Ressource: Max}
+  - {Id: 7, Predecessors: [2, 3], Activity: G, Effort: 5, Owner: dc, Ressource: Max}
+  - {Id: 8, Predecessors: [3, 4], Activity: H, Effort: 5, Owner: dc, Ressource: Max}
+  - {Id: 9, Predecessors: [4, 5], Activity: I, Effort: 5, Owner: dc, Ressource: Max}
+  - {Id: 10, Predecessors: [1, 2, 3], Activity: J, Effort: 6, Owner: zf, Ressource: Max}
+  - {Id: 11, Predecessors: [1, 2, 3, 4, 5], Activity: K, Effort: 7, Owner: zf, Ressource: Max}

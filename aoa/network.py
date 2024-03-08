@@ -2,21 +2,14 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
 from functools import cache
 from typing import List, Optional, Set
 
-from activity import Activity
 from more_itertools import powerset
-from node import Node
 
 import networkx as nx
-
-
-@dataclass
-class ActivityNodeLut:
-    start_node: Node
-    end_node: Node
+from aoa.activity import Activity
+from aoa.node import Node
 
 
 def to_key(id_set: Set[int]) -> str:
@@ -36,24 +29,14 @@ def static_vars(**kwargs):
     return decorate
 
 
-class IdGenerator:
-    def __init__(self, start_id: int = 0, increment: int = 1) -> None:
-        self.id = start_id
-        self.increment = increment
-
-    def __call__(self) -> int:
-        ret = self.id
-        self.id += self.increment
-        return ret
-
-
 class Network:
+    START_LABLE = "start"
+    END_LABLE = "end"
+
     def __init__(self, activities: List[Activity]) -> None:
-        self.allocate_dummy_activity_id = IdGenerator(-1, -1)
-        self.allocate_node_id = IdGenerator(0, 1)
         self.graph = nx.DiGraph()
-        start_node_id = to_key({self.allocate_node_id()})
-        self.graph.add_node(start_node_id, label="{Start|{Earliest Strart | 0}|{Latest Start | 10}}")
+        self.start_node_id = 0
+        self.graph.add_node(str(self.start_node_id), data=Node())
         self.end_activity_ids = self.get_end_activity_ids(activities)
 
         self.activities = copy.deepcopy(activities)
@@ -64,9 +47,14 @@ class Network:
         for activity in allocation_sequence:
             self.allocate_activity(activity)
 
-        nx.set_node_attributes(
-            self.graph, {start_node_id: "{Start|{Earliest Strart | 0}|{Latest Start | 10}}"}, "label"
-        )
+        nx.relabel_nodes(self.graph, {to_key({self.start_node_id}): Network.START_LABLE}, copy=False)
+        nx.relabel_nodes(self.graph, {to_key({self.end_node_id}): Network.END_LABLE}, copy=False)
+
+        self.graph.nodes[Network.END_LABLE]["data"].latest_finish = self.graph.nodes[Network.END_LABLE][
+            "data"
+        ].earliest_start
+        self.backtrack_cpm_values()
+        self.cpm_free_float_values()
 
     @property
     def graph(self) -> nx.DiGraph:
@@ -92,6 +80,33 @@ class Network:
         """
         powersets = [set(x) for x in list(powerset(predecessors))]
         return sorted(powersets, key=lambda x: len(x), reverse=True)
+
+    def cpm_free_float_values(self):
+        for start_node, end_node, data in self.graph.in_edges(data=True):
+            activity = data["activity"]
+            start_node = self.graph.nodes[start_node]["data"]
+            end_node = self.graph.nodes[end_node]["data"]
+            free_float = end_node.latest_finish - start_node.latest_finish - activity.duration
+            activity.free_float = free_float
+
+    def backtrack_cpm_values(self):
+        def recursion(end_nodes: List[str]):
+            new_end_nodes = []
+            for end_node in end_nodes:
+                for start_node, _, data in self.graph.in_edges(end_node, data=True):
+                    en = self.graph.nodes[end_node]["data"]
+                    activity = data["activity"]
+                    latest_finish = en.latest_finish - activity.duration
+                    sn = self.graph.nodes[start_node]["data"]
+                    activity.latest_finish = en.latest_finish
+                    activity.earliest_start = sn.earliest_start
+                    sn.update_latest_finish(latest_finish)
+                    new_end_nodes.append(start_node)
+
+            if new_end_nodes:
+                recursion(new_end_nodes)
+
+        recursion([Network.END_LABLE])
 
     def get_end_activity_ids(self, activities: list[Activity]) -> Set[int]:
         non_end_activities = {p for activity in activities for p in activity.predecessors}
@@ -165,17 +180,34 @@ class Network:
         return self.graph.has_node(to_key(s))
 
     def attach_activity(self, activity: Activity, start_node: Set[int]):
-        end_node = self.end_node_id if activity.id in self.end_activity_ids else str(activity.id)
-        self.graph.add_node(end_node)
-        self.graph.add_edge(to_key(start_node), end_node, activity=activity.id)
+        end_node = str(self.end_node_id) if activity.id in self.end_activity_ids else str(activity.id)
+        self.graph.add_node(end_node, data=Node())
+        self.graph.add_edge(to_key(start_node), end_node, activity=activity)
+        self.update_earliest_start_and_max_depth(end_node)
         return activity
 
     def create_dummy_activity(self, start_node: Set[int], end_node: Set[int]) -> Set[int]:
-        dummy_activity = self.allocate_dummy_activity_id()
+        dummy_activity = Activity()
         self.graph.add_edge(to_key(start_node), to_key(end_node), activity=dummy_activity)
         new_id = start_node.union(end_node)
         nx.relabel_nodes(self.graph, {to_key(end_node): to_key(new_id)}, copy=False)
+        self.update_earliest_start_and_max_depth(to_key(new_id))
         return new_id
+
+    def update_earliest_start_and_max_depth(self, end_node: str) -> None:
+        for start, _ in self.graph.in_edges(end_node):  # pyright: ignore [reportArgumentType]
+            self.evaluate_earliest_start_and_max_depth(start, end_node)
+
+    def evaluate_earliest_start_and_max_depth(self, start_node_name: str, end_node_name: str):
+        activity = self.graph.get_edge_data(start_node_name, end_node_name)["activity"]
+        duration = activity.duration
+        earliest_start_end_node = self.graph.nodes[start_node_name]["data"].earliest_start + duration
+
+        start_node = self.graph.nodes[start_node_name]["data"]
+        max_depth = start_node.max_depth + 1
+        end_node = self.graph.nodes[end_node_name]["data"]
+        end_node.update_earliest_start(earliest_start_end_node)
+        end_node.update_max_depth(max_depth)
 
     def find_mergable_subset_for_set(self, id_set: Set[int]) -> Optional[Set[int]]:
         """
@@ -253,7 +285,9 @@ class Network:
             tie_node_id
             if tie_node_id
             else (
-                set.union(*dummy_link_start_nodes) if dummy_link_start_nodes else {0}  # new floating node
+                set.union(*dummy_link_start_nodes)
+                if dummy_link_start_nodes
+                else {self.start_node_id}  # new floating node
             )  # the root node
         )
 
@@ -334,12 +368,11 @@ class Network:
         survivor_key = to_key(survivor)
         loser_key = to_key(loser)
         if not self.graph.has_node(survivor_key):
-            self.graph.add_node(survivor_key)
+            self.graph.add_node(survivor_key, data=Node())
         for start, _, data in self.graph.in_edges(loser_key, data=True):
-            if data:
-                self.graph.add_edge(start, survivor_key, activity=data["activity"])
+            self.graph.add_edge(start, survivor_key, activity=data["activity"])
+            self.evaluate_earliest_start_and_max_depth(start, survivor_key)
 
-        self.graph.get_edge_data
         self.graph.remove_node(loser_key)
 
     def have_common_ancestor(self, node_left: Set[int], node_right: Set[int]) -> bool:

@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Union
 
-from activity import Activity, DummyActivity
+from activity import Activity
 from network import Network
 
 
@@ -42,9 +42,11 @@ title Pert: Project Design
 
     def _get_network(self) -> str:
         network = [
-            f"{self.activity_node_lut[activity.id].start_node.id} -{self._line_fmt(activity)}-> {self.activity_node_lut[activity.id].end_node.id} : {activity.description} (Id={activity.id}, D={activity.duration}, TF={activity.total_float}, FF={activity.free_float})"
-            if type(activity) == Activity
-            else f"{self.activity_node_lut[activity.id].start_node.id} -{self._line_fmt(activity)}-> {self.activity_node_lut[activity.id].end_node.id}"
+            (
+                f"{self.activity_node_lut[activity.id].start_node.id} -{self._line_fmt(activity)}-> {self.activity_node_lut[activity.id].end_node.id} : {activity.description} (Id={activity.id}, D={activity.duration}, TF={activity.total_float}, FF={activity.free_float})"
+                if type(activity) == Activity
+                else f"{self.activity_node_lut[activity.id].start_node.id} -{self._line_fmt(activity)}-> {self.activity_node_lut[activity.id].end_node.id}"
+            )
             for node in self.sorted_nodes
             for activity in node.outbound_activities
         ]

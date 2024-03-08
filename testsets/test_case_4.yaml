@@ -1,0 +1,7 @@
+Activities:
+  - {Id: 1, Activity: A, Effort: 5}
+  - {Id: 2, Activity: B, Effort: 5}
+  - {Id: 3, Activity: C, Effort: 5}
+  - {Id: 4, Activity: D, Effort: 5}
+  - {Id: 5, Activity: E, Effort: 5, Predecessors: [1, 2, 3]}
+  - {Id: 6, Activity: F, Effort: 5, Predecessors: [2, 3, 4]}
