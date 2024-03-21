@@ -13,6 +13,7 @@ if __name__ == "__main__":
     # main(Path("testsets/AoA.yaml"))
     # main(Path("testsets/amd.yaml"))
     main = Runnable(Path("testsets/amd.yaml"))
+    # main = Runnable(Path("testsets/more_tricky.yaml"))
     main()
 
     # main(Path("tricky.yaml"))

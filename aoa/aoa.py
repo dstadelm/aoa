@@ -16,6 +16,7 @@ from matplotlib import pyplot as plt
 
 import networkx as nx
 from aoa.activity import Activity
+from aoa.coloring_strategy import ColoringStrategies
 from aoa.dot import set_dot_attributes
 from aoa.network import Network
 
@@ -70,6 +71,7 @@ class Runnable:
         extract_activities = timeit.Timer(self.extract_activities).timeit(1)
         create_graph = timeit.Timer(self.create_graph).timeit(1)
         create_dot = timeit.Timer(self.create_dot).timeit(1)
+        rank_nodes = timeit.Timer(self.rank_dot_nodes).timeit(1)
         layout_dot = timeit.Timer(self.layout_dot).timeit(1)
         display_dot = timeit.Timer(self.display_dot).timeit(1)
 
@@ -78,6 +80,7 @@ class Runnable:
         print("extract_activities " + str(extract_activities))
         print("create_graph " + str(create_graph))
         print("create_dot " + str(create_dot))
+        print("rank_nodes " + str(rank_nodes))
         print("layout_dot " + str(layout_dot))
         print("display_dot " + str(display_dot))
 
@@ -94,11 +97,25 @@ class Runnable:
         self.network = Network(self.activities)
 
     def create_dot(self):
-        set_dot_attributes(self.network.graph)
+        set_dot_attributes(self.network.graph, ColoringStrategies.exponential)
         self.gvz: pgvz.AGraph = nx.nx_agraph.to_agraph(self.network.graph)
 
     def layout_dot(self):
-        self.gvz.layout(prog="dot", args="-Nshape=Mrecord -Nrankdir=LR")
+        # self.gvz.graph_attr["rankdir"] = "LR"
+        self.gvz.graph_attr["rankdir"] = "TB"
+        self.gvz.layout(prog="dot", args="-Nshape=Mrecord")
+
+    def rank_dot_nodes(self):
+        print("in rank dot nodes")
+        rank_dict = dict()
+        for node_name in self.network.graph.nodes:
+            node = self.network.graph.nodes[node_name]["data"]
+            rank_dict.setdefault(node.max_depth, []).append(node_name)
+        print(rank_dict)
+
+        for key, value in rank_dict.items():
+            subgraph = self.gvz.add_subgraph(value, name=str(key))
+            subgraph.graph_attr["rank"] = "same"
 
     def display_dot(self):
         self.gvz.draw(self.file.with_suffix(".png"))
@@ -114,11 +131,11 @@ def main(file: Path) -> None:
     project = parse(file)
     annotate_with_duration(project)
     network = Network(get_activities(project))
-    set_dot_attributes(network.graph)
+    set_dot_attributes(network.graph, ColoringStrategies.relative)
     gvz: pgvz.AGraph = nx.nx_agraph.to_agraph(network.graph)
-    # gvz.graph_attr["rankdir"] = "LR"
+    gvz.graph_attr["rankdir"] = "LR"
 
-    gvz.layout(prog="dot", args="-Nshape=Mrecord -Nrankdir=LR")
+    gvz.layout(prog="dot", args="-Nshape=Mrecord")
     # dot = gvz.string()
     gvz.draw(file.with_suffix(".png"))
     gvz.draw(file.with_suffix(".svg"), format="svg")

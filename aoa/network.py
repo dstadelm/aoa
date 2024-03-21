@@ -188,6 +188,8 @@ class Network:
 
     def create_dummy_activity(self, start_node: Set[int], end_node: Set[int]) -> Set[int]:
         dummy_activity = Activity()
+        if to_key(end_node) not in self.graph.nodes:
+            self.graph.add_node(to_key(end_node), data=Node())
         self.graph.add_edge(to_key(start_node), to_key(end_node), activity=dummy_activity)
         new_id = start_node.union(end_node)
         nx.relabel_nodes(self.graph, {to_key(end_node): to_key(new_id)}, copy=False)

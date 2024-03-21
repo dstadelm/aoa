@@ -1,11 +1,11 @@
-from typing import List
-
 import networkx as nx
-from aoa.network import Network
+from aoa.coloring_strategy import ColoringStrategyProtocol
 
 
-def set_dot_attributes(graph: nx.DiGraph):
+def set_dot_attributes(graph: nx.DiGraph, coloring_strategy: ColoringStrategyProtocol):
     set_edge_attributes(graph)
+    coloring_strategy(graph)
+
     # critical_path = find_critical_path(graph)
 
 
