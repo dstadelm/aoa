@@ -26,6 +26,7 @@ class Activity:
     duration: int = field(default=0, compare=False)
     description: str = field(default="Dummy Activity", compare=False)
     predecessors: Set[int] = field(default_factory=set, compare=False)
+    downstream_predecessors: Set[int] = field(default_factory=set, compare=False)
     free_float: int = field(default=0, compare=False)
     earliest_start: int = field(default=0, compare=False)
     latest_finish: int = field(default=0, compare=False)

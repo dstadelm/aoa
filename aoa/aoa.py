@@ -7,7 +7,7 @@ import timeit
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, OrderedDict
 
 import pygraphviz as pgvz
 import yaml
@@ -24,6 +24,14 @@ YamlActivity = Dict[str, Any]
 YamlActivities = List[YamlActivity]
 
 logger = logging.getLogger(__name__)
+
+
+class AoAException(Exception):
+    """Base class exception for AOA."""
+
+
+class AllocationException(AoAException):
+    """Exception for allocation sequence errors"""
 
 
 class KeyMapping(Enum):
@@ -68,6 +76,7 @@ class Runnable:
     def __call__(self):
         parse_time = timeit.Timer(self.parse).timeit(1)
         annotation_time = timeit.Timer(self.annotate).timeit(1)
+        validation_time = timeit.Timer(self.validate).timeit(1)
         extract_activities = timeit.Timer(self.extract_activities).timeit(1)
         create_graph = timeit.Timer(self.create_graph).timeit(1)
         create_dot = timeit.Timer(self.create_dot).timeit(1)
@@ -77,6 +86,7 @@ class Runnable:
 
         print("parse_time " + str(parse_time))
         print("annotation_time " + str(annotation_time))
+        print("validation_time" + str(validation_time))
         print("extract_activities " + str(extract_activities))
         print("create_graph " + str(create_graph))
         print("create_dot " + str(create_dot))
@@ -89,6 +99,9 @@ class Runnable:
 
     def annotate(self):
         annotate_with_duration(self.project)
+
+    def validate(self):
+        validate(self.project)
 
     def extract_activities(self):
         self.activities = get_activities(self.project)
@@ -176,6 +189,50 @@ def annotate_with_duration(project: Dict[str, Any]):
         pensum = resources[activity[RESOURCE]][PENSUM] if resources else 1.0
         duration = math.ceil(effort / pensum)
         activity[DURATION] = duration
+
+
+def validate(project: Dict[str, Any]) -> OrderedDict[int, Activity]:
+    activities = get_activities(project)
+    activity_dict: dict[int, Activity] = dict()
+    for activity in activities:
+        if activity.id in activity_dict.keys():
+            raise AllocationException(f"ID {activity.id} is not unique")
+        activity_dict[activity.id] = activity
+
+    allocation_sequence = find_allocation_sequence(activity_dict, OrderedDict())
+    for activity in allocation_sequence.values():
+        intersection = activity.predecessors.intersection(activity.downstream_predecessors)
+        if intersection:
+            raise AllocationException(
+                f"Downstream activcities {intersection} detected as direct predecessors of activity {activity.id}"
+            )
+
+    return allocation_sequence
+
+
+def find_allocation_sequence(
+    unallocated_activities: dict[int, Activity], allocated_activities: OrderedDict[int, Activity]
+) -> OrderedDict[int, Activity]:
+    if not unallocated_activities:
+        return allocated_activities
+
+    allocated_set = set(allocated_activities.keys())
+    for id, activity in unallocated_activities.items():
+        if activity.predecessors.issubset(allocated_set):
+            update_downstream_predecessors(activity, allocated_activities)
+            allocated_activities[id] = activity
+            del unallocated_activities[id]
+            return find_allocation_sequence(unallocated_activities, allocated_activities)
+
+    raise AllocationException(
+        f"Activities {unallocated_activities.keys()}, can't be allocated as ther depencecies can't be resolved"
+    )
+
+
+def update_downstream_predecessors(activity: Activity, activity_repository: OrderedDict[int, Activity]):
+    for predecessor_id in activity.predecessors:
+        activity.downstream_predecessors.update(activity_repository[predecessor_id].predecessors)
+        activity.downstream_predecessors.update(activity_repository[predecessor_id].downstream_predecessors)
 
 
 def parse(file: Path):
