@@ -1,45 +1,71 @@
-from typing import Any, Generator, Set, Tuple
+from collections.abc import Iterable, Iterator, MutableMapping, Set
+from typing import override
 
-from node import Node
+from .node import Node
 
 
-class NodeDict(dict):
-    def to_key(self, id_set: Set[int]) -> str:
-        return "-".join(map(str, sorted(id_set)))
+class NodeDict(MutableMapping[Set[int], Node]):
+    """
+    A dict-like mapping from a set of ints to a Node.
+    - Accepts any AbstractSet[int] as a key; internally canonicalizes to frozenset[int].
+    - Iteration yields frozenset[int] keys.
+    """
 
-    def to_set(self, id: str) -> Set[int]:
-        return set([int(i) for i in id.split("-")])
+    __slots__ = ("_store",)  # pyright: ignore [reportUnannotatedClassAttribute]
 
-    def __setitem__(self, key: Set[int], value: Node) -> None:
-        value.start_dependencies = key
-        super().__setitem__(self.to_key(key), value)
+    def __init__(
+        self,
+        items: Iterable[tuple[Set[int], Node]] | None = None,
+    ) -> None:
+        self._store: dict[frozenset[int], Node] = {}
+        if items is not None:
+            for k, v in items:
+                self[k] = v  # go through __setitem__ to validate and normalize
 
+    # --- Internal helpers ---
+
+    def _norm_key(self, key: Set[int]) -> frozenset[int]:
+        """Normalize any Set[int] to a frozenset[int] and validate element types."""
+        try:
+            fs = frozenset(key)
+        except TypeError as e:
+            raise TypeError("Key must be an abstract set of ints") from e
+        return fs
+
+    # --- MutableMapping interface ---
+    @override
     def __getitem__(self, key: Set[int]) -> Node:
-        return super().__getitem__(self.to_key(key))
+        return self._store[self._norm_key(key)]
 
+    @override
+    def __setitem__(self, key: Set[int], value: Node) -> None:
+        self._store[self._norm_key(key)] = value
+
+    @override
     def __delitem__(self, key: Set[int]) -> None:
-        return super().__delitem__(self.to_key(key))
+        del self._store[self._norm_key(key)]
 
-    def __contains__(self, key: Set[int]) -> bool:
-        return super().__contains__(self.to_key(key))
+    @override
+    def __iter__(self) -> Iterator[frozenset[int]]:
+        # Iterates over normalized keys (frozenset[int])
+        return iter(self._store)
 
-    def items(self) -> Generator[Tuple[Set[int], Node], Any, Any]:
-        for k, v in super().items():
-            yield self.to_set(k), v
+    @override
+    def __len__(self) -> int:
+        return len(self._store)
 
-    def pop(self, key: Set[int]) -> Node:
-        return super().pop(self.to_key(key))
+    # Optional: faster membership test
+    @override
+    def __contains__(self, key: object) -> bool:
+        try:
+            k = self._norm_key(key)  # pyright: ignore [reportArgumentType]
+        except TypeError:
+            return False
+        return k in self._store
 
-    def keys(self) -> Generator[Set[int], Any, Any]:
-        for k in super().keys():
-            yield self.to_set(k)
-
-    def values(self) -> Generator[Node, Any, Any]:
-        for v in super().values():
-            yield v
-
+    # Optional: nicer representation
+    @override
     def __repr__(self) -> str:
-        m = "set, node id\n"
-        for k, v in self.items():
-            m += f"{k}:{v.start_dependencies} {v.id}\n"
-        return m
+        # Build a dict-like repr but keys are frozenset[int]
+        items = ", ".join(f"{k}: {v!r}" for k, v in self._store.items())
+        return f"{self.__class__.__name__}({{{items}}})"

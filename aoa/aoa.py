@@ -6,15 +6,13 @@ import math
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import yaml
-from activity import Activity
-from network import Network
-from plantuml import PlantUml
 
-YamlActivity = Dict[str, Any]
-YamlActivities = List[YamlActivity]
+from .activity import Activity
+from .network import Network
+from .plantuml import PlantUml
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +61,7 @@ def main(file: Path) -> None:
     plantuml.write_txt(file.with_suffix(".md"))
 
 
-def get_activities(project: Dict[str, Any]) -> List[Activity]:
+def get_activities(project: dict[str, Any]) -> list[Activity]:
     return [
         Activity(
             id=yaml_activity[ID],
@@ -75,13 +73,13 @@ def get_activities(project: Dict[str, Any]) -> List[Activity]:
     ]
 
 
-def get_resources(project: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+def get_resources(project: dict[str, Any]) -> dict[str, dict[str, Any]]:
     if RESOURCES in project:
         return {entry["Id"]: entry for entry in project[RESOURCES]}
     return dict()
 
 
-def annotate_with_duration(project: Dict[str, Any]):
+def annotate_with_duration(project: dict[str, Any]):
     resources = get_resources(project)
     for activity in project[ACTIVITIES]:
         effort = activity[EFFORT]
@@ -102,8 +100,9 @@ if __name__ == "__main__":
     FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
     logging.basicConfig(format=FORMAT)
     logger.setLevel(logging.DEBUG)
-    main(Path("../AoA.yaml"))
+    # main(Path("../AoA.yaml"))
     # main(Path("tricky.yaml"))
-    # main(Path("more_tricky.yaml"))
+    # main(Path("../more_tricky.yaml"))
     # main(Path("test_case_3.yaml"))
     # main(Path("test_case_5.yaml"))
+    main(Path("../amd.yaml"))
