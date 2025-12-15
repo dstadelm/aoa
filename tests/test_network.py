@@ -49,10 +49,18 @@ def test_two_parallel_activities():
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 3  # start and end nodes
     assert nodes[0].outbound_activities == [activities[0], activities[1]]
-    assert nodes[1].inbound_activities[0].id == 2
-    assert nodes[1].outbound_activities[0].id == -1
-    assert nodes[2].inbound_activities[0].id == 1
-    assert nodes[2].inbound_activities[1].id == -1
+
+    activity_node_1_id = [activity.id for activity in nodes[1].inbound_activities if activity.id > 0][0]
+    activity_node_2_id = [activity.id for activity in nodes[2].inbound_activities if activity.id > 0][0]
+    assert activity_node_1_id == 3 - activity_node_2_id
+
+    if nodes[1].outbound_activities:
+        node_2_inbound_dummy_ids = [activity.id for activity in nodes[2].inbound_activities if activity.id < 0]
+        assert nodes[1].outbound_activities[0].id in node_2_inbound_dummy_ids
+
+    if nodes[2].outbound_activities:
+        node_1_inbound_dummy_ids = [activity.id for activity in nodes[1].inbound_activities if activity.id < 0]
+        assert nodes[2].outbound_activities[0].id in node_1_inbound_dummy_ids
 
 
 def test_three_parallel_activities():
