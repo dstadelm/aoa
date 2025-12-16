@@ -262,7 +262,9 @@ class Network:
         end_node.inbound_activities.append(activity)
         # end_node.earliest_start = start_node.earliest_start + activity.duration
         self._activity_node_lut[activity.id] = ActivityNodes(start_node, end_node)
-        start_dependencies = set.union(start_node.start_dependencies, {activity.id})
+        start_dependencies = set.union(  # pyright: ignore [reportUnknownVariableType, reportUnknownMemberType]
+            start_node.start_dependencies, {activity.id}
+        )
         end_node.start_dependencies = start_dependencies
         self.node_dict[start_dependencies] = end_node
 
