@@ -88,3 +88,43 @@ def test_three_parallel_activities():
     assert nodes[3].inbound_activities[0].id == 1
     assert nodes[3].inbound_activities[1].id == -1
     assert nodes[3].inbound_activities[2].id == -2
+
+
+def test_complex_network():
+    """Test a complex network with multiple dependencies."""
+    activities = [
+        Activity(id=1),
+        Activity(id=2),
+        Activity(id=3),
+        Activity(id=4),
+        Activity(id=5),
+        Activity(id=6, predecessors={1, 2}),
+        Activity(id=7, predecessors={2, 3}),
+        Activity(id=8, predecessors={3, 4}),
+        Activity(id=9, predecessors={4, 5}),
+        Activity(id=10, predecessors={1, 2, 3}),
+        Activity(id=11, predecessors={1, 2, 3, 4, 5}),
+    ]
+
+    network = Network(activities)
+    nodes: list[Node] = network.get_node_list_sorted_by_depth()
+    assert len(nodes) == 11
+    assert nodes[0].outbound_activities == [activities[0], activities[1], activities[2], activities[3], activities[4]]
+
+    def set_to_str(value: set[int]) -> str:
+        if not value:
+            return "start"
+        return "-".join(str(v) for v in sorted(value))
+
+    node_start_dependencies = [set_to_str(node.start_dependencies) for node in nodes]
+    assert "start" in node_start_dependencies
+    assert "2" in node_start_dependencies
+    assert "3" in node_start_dependencies
+    assert "4" in node_start_dependencies
+    assert "1-2" in node_start_dependencies
+    assert "2-3" in node_start_dependencies
+    assert "3-4" in node_start_dependencies
+    assert "4-5" in node_start_dependencies
+    assert "1-2-3" in node_start_dependencies
+    assert "1-2-3-4-5" in node_start_dependencies
+    assert "1-2-3-4-5-6-7-8-9-10-11" in node_start_dependencies

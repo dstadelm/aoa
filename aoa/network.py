@@ -214,6 +214,7 @@ class Network:
                     max_depth = node.max_depth
                     tie_node = node
 
+        # Remove the tie_node from the end_nodes list
         if tie_node.start_dependencies:
             del end_nodes[tie_node.start_dependencies]
 
@@ -224,7 +225,14 @@ class Network:
                 _ = self._create_dummy_activity(node, tie_node)
             else:
                 for activity in node.inbound_activities:
+                    # update the inbound activities and start dependencies
+                    del self.node_dict[tie_node.start_dependencies]
                     tie_node.inbound_activities.append(activity)
+                    tie_node.start_dependencies = tie_node.start_dependencies.union(
+                        self._activity_node_lut[activity.id].start_node.start_dependencies, {activity.id}
+                    )
+                    self.node_dict[tie_node.start_dependencies] = tie_node
+
                     self._activity_node_lut[activity.id].end_node = tie_node
                     # if isinstance(activity, Activity):
                     #     earliest_start = self._activities[activity.id].start_node.earliest_start + activity.duration
@@ -254,8 +262,9 @@ class Network:
         end_node.inbound_activities.append(activity)
         # end_node.earliest_start = start_node.earliest_start + activity.duration
         self._activity_node_lut[activity.id] = ActivityNodes(start_node, end_node)
-        end_node.start_dependencies = {activity.id}
-        self.node_dict[{activity.id}] = end_node
+        start_dependencies = set.union(start_node.start_dependencies, {activity.id})
+        end_node.start_dependencies = start_dependencies
+        self.node_dict[start_dependencies] = end_node
 
     def _create_dummy_activity(self, start_node: Node, end_node: Node) -> set[int]:
         """Add an dummy node between a start and end node.
