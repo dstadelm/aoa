@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from aoa.project import ProjectDictType, deserialize_project
-from aoa.state import State
+from aoa.model.project import ProjectDictType, deserialize_project
+from aoa.model.state import State
 
 
 def test_load_start_date() -> None:

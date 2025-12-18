@@ -1,6 +1,6 @@
-from aoa.activity import Activity
-from aoa.network import Network
-from aoa.node import Node
+from aoa.model.activity import Activity
+from aoa.model.network import Network
+from aoa.model.node import Node
 
 
 def test_one_activity():
