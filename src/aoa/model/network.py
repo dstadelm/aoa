@@ -57,6 +57,17 @@ class Network:
         nodes += list(sorted(self.node_dict.values(), key=lambda x: x.id))
         return nodes
 
+    def get_activity_nodes(self, activity_id: int) -> ActivityNodes:
+        """Returns the start and end node for a given activity id.
+
+        Arguments:
+            activity_id (int): The id of the activity
+
+        Returns:
+            ActivityNodes: The start and end node for the given activity id
+        """
+        return self._activity_node_lut[activity_id]
+
     @classmethod
     def power_subset(cls, predecessors: list[int]) -> list[set[int]]:
         """For a list of values returns all possible power sets from largest to smallest.
@@ -110,6 +121,14 @@ class Network:
 
         An activity can be allocated, when all activities which the activity depends on have been allocated. Returns a
         list of activities in the order of allocation of the activities
+
+        Arguments:
+            activities (list[Activity]): The list of activities to allocate
+            allocated_activities (list[Activity]): The list of already allocated activities
+            allocated_ids (set[int]): The set of already allocated activity ids
+
+        Returns:
+            list[Activity]: The list of activities in the order of allocation
         """
         if not activities:
             return allocated_activities
@@ -234,14 +253,9 @@ class Network:
                     self.node_dict[tie_node.start_dependencies] = tie_node
 
                     self._activity_node_lut[activity.id].end_node = tie_node
-                    # if isinstance(activity, Activity):
-                    #     earliest_start = self._activities[activity.id].start_node.earliest_start + activity.duration
-                    #     if tie_node.earliest_start < earliest_start:
-                    #         tie_node.earliest_start = earliest_start
                 if node.id != 0:
                     _ = self.node_dict.pop(node.start_dependencies)
 
-        tie_node.latest_start = tie_node.earliest_start
         self.end_node = tie_node
         self.end_node.is_end = True
 
@@ -261,7 +275,6 @@ class Network:
         end_node = Node(next(self.node_id), max_depth=start_node.max_depth + 1)
         start_node.outbound_activities.append(activity)
         end_node.inbound_activities.append(activity)
-        # end_node.earliest_start = start_node.earliest_start + activity.duration
         self._activity_node_lut[activity.id] = ActivityNodes(start_node, end_node)
         start_dependencies = set.union(  # pyright: ignore [reportUnknownVariableType, reportUnknownMemberType]
             start_node.start_dependencies, {activity.id}
@@ -284,7 +297,6 @@ class Network:
         end_node.inbound_activities.append(dummy_activity)
 
         end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
-        end_node.earliest_start = max([start_node.earliest_start, end_node.earliest_start])
 
         if end_node.start_dependencies in self.node_dict:
             # Only delete the entry if it references this end_node
@@ -336,6 +348,12 @@ class Network:
                 return None
 
         if mutable_node_id:
+            if mutable_node_id not in self.node_dict:
+                contenders = [key for key in self.node_dict.keys() if mutable_node_id.issubset(key)]
+                sorted_contenders = sorted(contenders, key=lambda x: len(x))
+                mutable_node_id = set(sorted_contenders[0])
+
+        if mutable_node_id:
             return mutable_node_id
         else:
             return None
@@ -354,8 +372,11 @@ class Network:
 
         # if it exists find the node to which all predecessors can be bound
         if tie_node_id := self._find_tieable_node_for_set(predecessors.copy()):
-            self._merge_subset(tie_node_id)
-            predecessors.difference_update(tie_node_id)
+            try:
+                self._merge_subset(tie_node_id)
+                predecessors.difference_update(tie_node_id)
+            except Exception:
+                pass
 
         # find subsets that can be created from existing sub-subsets
         mergeable_nodes = [
@@ -417,13 +438,16 @@ class Network:
         activity_ids_to_link: list[set[int]] = []
         mutable_merge_set = merge_set.copy()
         while mutable_merge_set:
+            old_mutable_merge_set = mutable_merge_set.copy()
             for subset in Network.power_subset(list(mutable_merge_set)):
                 if set(subset) in self.node_dict:
                     activity_ids_to_link.append(set(subset))
                     mutable_merge_set.difference_update(subset)
                     break
-
-        self._recursive_merge(activity_ids_to_link[0], activity_ids_to_link[1:])
+            if old_mutable_merge_set == mutable_merge_set:
+                raise Exception("Unable to merge subset")
+        if activity_ids_to_link:
+            self._recursive_merge(activity_ids_to_link[0], activity_ids_to_link[1:])
 
     def _recursive_merge(self, head: set[int], tail: list[set[int]]) -> None:
         new_head: set[int] = set()

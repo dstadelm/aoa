@@ -123,3 +123,47 @@ def test_complex_network():
     assert "1-2-3" in node_start_dependencies
     assert "1-2-3-4-5" in node_start_dependencies
     assert "end" in node_start_dependencies
+
+
+def test_multiple_end_nodes() -> None:
+
+    activities = [
+        Activity(
+            id=1,
+            effort=10,
+        ),
+        Activity(
+            id=2,
+            effort=1,
+        ),
+        Activity(
+            id=3,
+            effort=1,
+            predecessors={2},
+        ),
+        Activity(
+            id=4,
+            effort=1,
+            predecessors={3},
+        ),
+        Activity(
+            id=5,
+            effort=1,
+            predecessors={2},
+        ),
+    ]
+
+    network = Network(activities)
+    nodes: list[Node] = network.get_node_list_sorted_by_depth()
+    assert len(nodes) == 4
+
+    def stdp_2_str(node: Node) -> str:
+        if not node.start_dependencies:
+            return "start"
+        return "-".join(str(dep) for dep in sorted(node.start_dependencies))
+
+    node_start_dependencies = [stdp_2_str(node) for node in nodes]
+    assert "start" in node_start_dependencies
+    assert "2" in node_start_dependencies
+    assert "1-2-3-4-5" in node_start_dependencies
+    assert "2-3" in node_start_dependencies

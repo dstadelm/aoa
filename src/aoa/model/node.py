@@ -8,8 +8,6 @@ from .activity import Activity, DummyActivity
 class Node:
     id: int
     is_end: bool = field(default=False, compare=False)
-    earliest_start: int = field(default=0, compare=False)
-    latest_start: int = field(default=0, compare=False)
     inbound_activities: list[Activity | DummyActivity] = field(default_factory=list, repr=False, compare=False)
     outbound_activities: list[Activity | DummyActivity] = field(default_factory=list, repr=False, compare=False)
     max_depth: int = field(default=0, compare=False)
