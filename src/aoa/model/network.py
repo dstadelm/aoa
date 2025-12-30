@@ -243,6 +243,7 @@ class Network:
 
         tie_node.latest_start = tie_node.earliest_start
         self.end_node = tie_node
+        self.end_node.is_end = True
 
     def _attach_activity(self, activity: Activity, start_node: Node) -> None:
         """Attach an activity to given start node and create an end node.
