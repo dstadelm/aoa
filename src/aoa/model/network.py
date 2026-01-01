@@ -247,9 +247,9 @@ class Network:
                     # update the inbound activities and start dependencies
                     del self.node_dict[tie_node.start_dependencies]
                     tie_node.inbound_activities.append(activity)
-                    tie_node.start_dependencies = tie_node.start_dependencies.union(
-                        self._activity_node_lut[activity.id].start_node.start_dependencies, {activity.id}
-                    )
+                    # tie_node.start_dependencies = tie_node.start_dependencies.union(
+                    #     self._activity_node_lut[activity.id].start_node.start_dependencies, {activity.id}
+                    # )
                     self.node_dict[tie_node.start_dependencies] = tie_node
 
                     self._activity_node_lut[activity.id].end_node = tie_node
@@ -276,11 +276,7 @@ class Network:
         start_node.outbound_activities.append(activity)
         end_node.inbound_activities.append(activity)
         self._activity_node_lut[activity.id] = ActivityNodes(start_node, end_node)
-        start_dependencies = set.union(  # pyright: ignore [reportUnknownVariableType, reportUnknownMemberType]
-            start_node.start_dependencies, {activity.id}
-        )
-        end_node.start_dependencies = start_dependencies
-        self.node_dict[start_dependencies] = end_node
+        self.node_dict[end_node.start_dependencies] = end_node
 
     def _create_dummy_activity(self, start_node: Node, end_node: Node) -> set[int]:
         """Add an dummy node between a start and end node.
@@ -297,14 +293,17 @@ class Network:
         end_node.inbound_activities.append(dummy_activity)
 
         end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
+        dummy_activity.predecessors = start_node.start_dependencies
 
-        if end_node.start_dependencies in self.node_dict:
-            # Only delete the entry if it references this end_node
-            # For building nodes a node with this can already exist, and that node shall not be deleted
-            if self.node_dict[end_node.start_dependencies].id == end_node.id:
-                _ = self.node_dict.pop(end_node.start_dependencies)
+        del_key = next((key for key, value in self.node_dict.items() if value.id == end_node.id), None)
+        if del_key:
+            del self.node_dict[del_key]
 
-        end_node.start_dependencies = end_node.start_dependencies.union(start_node.start_dependencies)
+        # if end_node.direct_start_dependencies in self.node_dict:
+        #     # Only delete the entry if it references this end_node
+        #     # For building nodes a node with this can already exist, and that node shall not be deleted
+        #     if self.node_dict[end_node.direct_start_dependencies].id == end_node.id:
+        #         _ = self.node_dict.pop(end_node.direct_start_dependencies)
 
         # When building a new floating node we will create temporary node ids which already exist
         if end_node.start_dependencies not in self.node_dict:
@@ -348,12 +347,10 @@ class Network:
                 return None
 
         if mutable_node_id:
-            if mutable_node_id not in self.node_dict:
-                contenders = [key for key in self.node_dict.keys() if mutable_node_id.issubset(key)]
-                sorted_contenders = sorted(contenders, key=lambda x: len(x))
-                mutable_node_id = set(sorted_contenders[0])
-
-        if mutable_node_id:
+            # if mutable_node_id not in self.node_dict:
+            #     contenders = [key for key in self.node_dict.keys() if mutable_node_id.issubset(key)]
+            #     sorted_contenders = sorted(contenders, key=lambda x: len(x))
+            #     mutable_node_id = set(sorted_contenders[0])
             return mutable_node_id
         else:
             return None
@@ -372,11 +369,8 @@ class Network:
 
         # if it exists find the node to which all predecessors can be bound
         if tie_node_id := self._find_tieable_node_for_set(predecessors.copy()):
-            try:
-                self._merge_subset(tie_node_id)
-                predecessors.difference_update(tie_node_id)
-            except Exception:
-                pass
+            self._merge_subset(tie_node_id)
+            predecessors.difference_update(tie_node_id)
 
         # find subsets that can be created from existing sub-subsets
         mergeable_nodes = [
@@ -459,7 +453,7 @@ class Network:
                     self._activity_node_lut[activity.id].end_node = self.node_dict[head]
                     self.node_dict[head].inbound_activities.append(activity)
                 new_head = head.union(tail[0])
-                self.node_dict[head].start_dependencies = new_head
+                # self.node_dict[head].start_dependencies = new_head
                 self.node_dict[new_head] = self.node_dict[head]  # Update lookup with new key
                 _ = self.node_dict.pop(tail[0])
                 _ = self.node_dict.pop(head)

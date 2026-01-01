@@ -165,5 +165,5 @@ def test_multiple_end_nodes() -> None:
     node_start_dependencies = [stdp_2_str(node) for node in nodes]
     assert "start" in node_start_dependencies
     assert "2" in node_start_dependencies
-    assert "1-2-3-4-5" in node_start_dependencies
-    assert "2-3" in node_start_dependencies
+    assert "3" in node_start_dependencies
+    assert "1-4-5" in node_start_dependencies

@@ -11,7 +11,12 @@ class Node:
     inbound_activities: list[Activity | DummyActivity] = field(default_factory=list, repr=False, compare=False)
     outbound_activities: list[Activity | DummyActivity] = field(default_factory=list, repr=False, compare=False)
     max_depth: int = field(default=0, compare=False)
-    start_dependencies: set[int] = field(default_factory=set)
+
+    @property
+    def start_dependencies(self) -> set[int]:
+        start_dependencies = {activity.id for activity in self.inbound_activities if activity.id >= 0}
+        dummy_start_dependencies = [activity.predecessors for activity in self.inbound_activities if activity.id < 0]
+        return start_dependencies.union(*dummy_start_dependencies)
 
     @override
     def __str__(self) -> str:

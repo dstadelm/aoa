@@ -50,4 +50,10 @@ def test_latest_finish_calculation() -> None:
     ]
 
     network = Network(activities)
-    # calculate_latest_finish(network)
+    calculate_earliest_start(network)
+    calculate_latest_finish(network)
+    assert activities[0].latest_finish == 10
+    assert activities[1].latest_finish == 10
+    assert activities[2].latest_finish == 10
+    assert activities[3].latest_finish == 10
+    assert activities[4].latest_finish == 10
