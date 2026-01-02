@@ -31,11 +31,11 @@ class Activity:
 
     @property
     def earliest_finish(self) -> float:
-        return self.earliest_start + self.effort
+        return self.earliest_start + self.duration
 
     @property
     def latest_start(self) -> float:
-        return self.latest_finish - self.effort
+        return self.latest_finish - self.duration
 
     @property
     def duration(self) -> float:
