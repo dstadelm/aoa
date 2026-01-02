@@ -1,4 +1,4 @@
-from aoa.model.activity import Activity
+from aoa.model.activity import Activity, ActivityProtocol, DummyActivity
 from aoa.model.cpm import calculate_earliest_start, calculate_latest_finish
 from aoa.model.network import Network
 
@@ -39,21 +39,23 @@ def test_latest_finish_calculation() -> None:
         ),
         Activity(
             id=4,
-            effort=1,
+            effort=2,
             predecessors={3},
         ),
         Activity(
             id=5,
-            effort=1,
+            effort=4,
             predecessors={2},
         ),
     ]
 
     network = Network(activities)
-    calculate_earliest_start(network)
     calculate_latest_finish(network)
-    assert activities[0].latest_finish == 10
-    assert activities[1].latest_finish == 10
-    assert activities[2].latest_finish == 10
-    assert activities[3].latest_finish == 10
-    assert activities[4].latest_finish == 10
+    activity_id_lut: dict[int, Activity | DummyActivity] = {}
+    for activity in activities:
+        activity_id_lut[activity.id] = activity
+    assert activity_id_lut[1].latest_finish == 10
+    assert activity_id_lut[2].latest_finish == 6
+    assert activity_id_lut[3].latest_finish == 8
+    assert activity_id_lut[4].latest_finish == 10
+    assert activity_id_lut[5].latest_finish == 10
