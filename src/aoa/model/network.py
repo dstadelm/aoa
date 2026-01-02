@@ -295,15 +295,10 @@ class Network:
         end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
         dummy_activity.predecessors = start_node.start_dependencies
 
+        # to make sure there are no duplicates in the dict, find entry where the node's id matches and delete it
         del_key = next((key for key, value in self.node_dict.items() if value.id == end_node.id), None)
         if del_key:
             del self.node_dict[del_key]
-
-        # if end_node.direct_start_dependencies in self.node_dict:
-        #     # Only delete the entry if it references this end_node
-        #     # For building nodes a node with this can already exist, and that node shall not be deleted
-        #     if self.node_dict[end_node.direct_start_dependencies].id == end_node.id:
-        #         _ = self.node_dict.pop(end_node.direct_start_dependencies)
 
         # When building a new floating node we will create temporary node ids which already exist
         if end_node.start_dependencies not in self.node_dict:
