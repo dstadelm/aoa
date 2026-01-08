@@ -30,7 +30,8 @@ def id_generator(start: int = -1, increment: int = 1) -> Generator[int, None, No
 class Network:
     def __init__(self, activities: list[Activity]):
         self.node_dict: NodeDict = NodeDict()
-        self.activities: list[Activity] = copy.deepcopy(activities)
+        self.activities: list[Activity] = activities
+        self.activities_by_id: dict[int, Activity] = dict()
 
         self._activity_node_lut: dict[int, ActivityNodes] = dict()
 
@@ -42,6 +43,7 @@ class Network:
 
         allocation_sequence = self._get_allocation_sequence(activities, list(), set())
         for activity in allocation_sequence:
+            self.activities_by_id[activity.id] = activity
             self._allocate_activity(activity)
         self._tie_end_node()
         self._renumber_nodes()
@@ -57,16 +59,38 @@ class Network:
         nodes += list(sorted(self.node_dict.values(), key=lambda x: x.id))
         return nodes
 
-    def get_activity_nodes(self, activity_id: int) -> ActivityNodes:
-        """Returns the start and end node for a given activity id.
+    def get_activity_nodes(self, activity: Activity | DummyActivity) -> ActivityNodes:
+        """Returns the start and end node for a given activity
 
         Arguments:
-            activity_id (int): The id of the activity
+            activity (Activity): The activity
 
         Returns:
-            ActivityNodes: The start and end node for the given activity id
+            ActivityNodes: The start and end node for the given activity
         """
-        return self._activity_node_lut[activity_id]
+        return self._activity_node_lut[activity.id]
+
+    def get_activity_start_node(self, activity: Activity | DummyActivity) -> Node:
+        """Returns the start node for a given activity
+
+        Arguments:
+            activty (Activity): The activity
+
+        Returns:
+            Node: The start node of the given activity
+        """
+        return self._activity_node_lut[activity.id].start_node
+
+    def get_activity_end_node(self, activity: Activity | DummyActivity) -> Node:
+        """Returns the start node for a given activity
+
+        Arguments:
+            activty (Activity): The activity
+
+        Returns:
+            Node: The start node of the given activity
+        """
+        return self._activity_node_lut[activity.id].end_node
 
     @classmethod
     def power_subset(cls, predecessors: list[int]) -> list[set[int]]:

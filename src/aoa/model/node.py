@@ -18,6 +18,26 @@ class Node:
         dummy_start_dependencies = [activity.predecessors for activity in self.inbound_activities if activity.id < 0]
         return start_dependencies.union(*dummy_start_dependencies)
 
+    @property
+    def earliest_start(self) -> float:
+        if self.is_end:
+            return max(
+                [activity.earliest_start + activity.duration for activity in self.inbound_activities], default=0.0
+            )
+        else:
+            return self.outbound_activities[0].earliest_start
+
+    @property
+    def latest_start(self) -> float:
+        if self.is_end:
+            return self.earliest_start
+        else:
+            return min([activity.latest_start for activity in self.outbound_activities], default=0.0)
+
+    @property
+    def latest_finish(self) -> float:
+        return self.earliest_start
+
     @override
     def __str__(self) -> str:
         if not self.start_dependencies:
