@@ -1,0 +1,45 @@
+Project:
+  Start: 5.2.2024
+  Milestones:
+    - {Id: "MS 010", Description: "Checklist of functional and performance requirements", Owner: "SCS/AMD", Due Date: 16.3.2024, Status: "Open"}
+    - {Id: "MS 020", Description: "Acquisition iWave eval kit", Owner: "SCS", Due Date: 16.3.2024, Status: "Done"}
+    - {Id: "MS 030", Description: "Feasability Analysis", Owner: "SCS", Due Date: 8.4.2024, Status: "Done"}
+    - {Id: "MS 040", Description: "GUI Wireframe Draft", Owner: "SCS", Due Date: 8.4.2024, Status: "Done"}
+    - {Id: "MS 050", Description: "GUI Draft Acknoledgement", Owner: "SCS", Due Date: 11.4.2024, Status: "Done"}
+    - {Id: "MS 060", Description: "GUI Performance Test", Owner: "SCS", Due Date: 20.4.2024, Status: "Done"}
+    - {Id: "MS 070", Description: "PCIe Example design on iWave eval board", Owner: "SCS", Due Date: 30.4.2024, Status: "Done"}
+    - {Id: "MS 080", Description: "HW Production Data", Owner: "SCS", Due Date: 18.5.2024, Status: "Done"}
+    - {Id: "MS 090", Description: "Simple Benchmark example on iWave eval Kit", Owner: "SCS", Due Date: 31.5.2024, Status: "Open"}
+    - {Id: "MS 100", Description: "80% Functionality on iWave SOM", Owner: "SCS", Due Date: 24.7.2024, Status: "Open"}
+    - {Id: "MS 110", Description: "Production Release", Owner: "SCS", Due Date: 4.9.2024, Status: "Open"}
+    - {Id: "MS 120", Description: "Final Release", Owner: "SCS", Due Date: 21.9.2024, Status: "Open"}
+Resources:
+  - {Id: ESC, Name: "Emanuel Schmid", Weekdays: "1110100", Pensum: 0.8, Holidays: []}
+  - {Id: GAR, Name: "Giacomo Arrigoni", Weekdays: "1101100", Pensum: 0.8, Holidays: []}
+  - {Id: DST, Name: "David Stadelmann", Weekdays: "1110100", Pensum: 0.7, Holidays: []}
+  - {Id: PM, Name: "Philippe Marchand", Weekdays: "1111100", Pensum: 1.0, Holidays: []}
+Activities:
+  - {Id: 1, Activity: Feasability Study/Architecture, State: Done, Effort: 40, Owner: scs, Resource: "ESC"}
+  - {Id: 2, Predecessors: [1], Activity: HW Define I/O requirements, State: Done, Effort: 5, Owner: scs, Resource: "GAR"}
+  - {Id: 3, Predecessors: [2], Activity: HW Schema, State: Done, Effort: 20, Owner: scs, Resource: "GAR"}
+  - {Id: 4, Predecessors: [3], Activity: HW Layout, State: Done, Effort: 20, Owner: scs, Resource: "GAR"}
+  - {Id: 5, Predecessors: [4], Activity: HW Production, State: Open, Effort: 30, Owner: scs, Resource: "GAR"}
+  - {Id: 6, Predecessors: [5], Activity: HW Bringup, State: Open, Effort: 10, Owner: scs, Resource: "GAR"}
+  - {Id: 7, Predecessors: [1], Activity: Setup Development Environment, State: Done, Effort: 10, Owner: scs, Resource: "DST"}
+  - {Id: 8, Predecessors: [1], Activity: FW Testing Infrastructure, State: In Progress, Effort: 10, Owner: scs, Resource: "DST"}
+  - {Id: 9, Predecessors: [7, 8], Activity: FW Linux configuration, State: Open, Effort: 5, Owner: scs, Resource: "DST"}
+  - {Id: 10, Predecessors: [9], Activity: FW Architecture Infrastructure (PCIe), State: Done, Effort: 5, Owner: scs, Resource: "DST"}
+  - {Id: 11, Predecessors: [10], Activity: FW Implementation Data Transfer and Signaling, State: In Progress, Effort: 15, Owner: scs, Resource: "DST"}
+  - {Id: 12, Predecessors: [7, 8], Activity: FW Architecture RadarChain (AIE-ML), State: In Progress, Effort: 5, Owner: scs, Resource: "ESC"}
+  - {Id: 13, Predecessors: [12], Activity: FW Implementation RadarChain (AIE-ML), State: Open, Effort: 20, Owner: scs, Resource: "ESC"}
+  - {Id: 14, Predecessors: [7, 8], Activity: SW Scene Generator Architecture, State: Open, Effort: 5, Owner: scs, Resource: "DST"}
+  - {Id: 15, Predecessors: [14], Activity: SW Scene Generator Implementation, State: Open, Effort: 15, Owner: scs, Resource: "DST"}
+  - {Id: 16, Predecessors: [15], Activity: "SW Data Push Architecture", State: Done, Effort: 2, Owner: scs, Resource: "DST"}
+  - {Id: 17, Predecessors: [16], Activity: SW Data Push Implementation, State: Open, Effort: 5, Owner: scs, Resource: "DST"}
+  - {Id: 18, Predecessors: [17], Activity: "SW Data Pop Architecture ", State: Done, Effort: 2, Owner: scs, Resource: "DST"}
+  - {Id: 19, Predecessors: [18], Activity: SW Data Pop Implementation, State: Open, Effort: 5, Owner: scs, Resource: "DST"}
+  - {Id: 20, Predecessors: [7, 8], Activity: SW Gui Select Framework, State: Done, Effort: 5, Owner: scs, Resource: "PM"}
+  - {Id: 21, Predecessors: [20], Activity: SW Gui Pilot Performance Test, State: Done, Effort: 2, Owner: scs, Resource: "PM"}
+  - {Id: 22, Predecessors: [21], Activity: SW Gui Wireframe, State: Done, Effort: 5, Owner: scs, Resource: "PM"}
+  - {Id: 23, Predecessors: [22], Activity: SW Gui Implementation, State: Done, Effort: 15, Owner: scs, Resource: "PM"}
+  - {Id: 24, Predecessors: [23, 19, 13], Activity: Integration, State: Open, Effort: 5, Owner: scs, Resource: ESC}

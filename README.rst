@@ -14,6 +14,7 @@ Links
 *****
 TODOs
 *****
+| |-| Check the load of ressources -> how to handle overload?
 | |-| Create a class for activities
 | |-| Add the allocation sequence to that class
 | |-| Add checks to that class that the dependencies are sound
@@ -22,6 +23,14 @@ TODOs
 | |-| Split duration and effort
 | |-| Remove Earliest Start and Latest Start for nodes that only have dummy activity output edges
 
+************
+Requirements
+************
+sudo apt install graphviz
+sudo apt install libgraphviz-dev
+
 .. |-| unicode:: U+2610
 .. |x| unicode:: U+2611
 .. |y| unicode:: U+1F5F9
+
+
