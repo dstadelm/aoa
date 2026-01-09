@@ -3,8 +3,8 @@ from datetime import date
 from aoa.model.activity import Activity
 from aoa.model.cpm import calculate_cpm
 from aoa.model.network import Network
+from aoa.transform.gantt import create_gantt
 from aoa.transform.plantuml import PlantUml
-from aoa.transformation.gantt import create_gantt
 
 
 def test_simple_diamond_pert() -> None:
