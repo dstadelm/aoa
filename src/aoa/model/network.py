@@ -178,40 +178,6 @@ class Network:
             allocated_ids.union(*allocateable_activity_ids),
         )
 
-    # def calculate_latest_start(self, nodes_sorted_by_depth: list[Node]) -> None:
-    #     """Iterate over all nodes and determines the latest possible start.
-    #
-    #     The nodes are updated with the according latest possible start value.
-    #
-    #     Attributes:
-    #         nodes_sorted_by_depth(list[Node]): Nodes of the network sorted by depth
-    #
-    #     """
-    #     reversed_nodes = [nodes_sorted_by_depth[i] for i in range(len(nodes_sorted_by_depth) - 1, -1, -1)]
-    #     for node in reversed_nodes:
-    #         latest_starts: list[int] = [
-    #             self._activities[activity.id].end_node.latest_start - activity.duration
-    #             for activity in node.outbound_activities
-    #             if type(activity) is Activity
-    #         ]
-    #         latest_starts += [
-    #             self._activities[activity.id].end_node.latest_start
-    #             for activity in node.outbound_activities
-    #             if type(activity) is DummyActivity
-    #         ]
-    #         if latest_starts:
-    #             node.latest_start = min(latest_starts)
-    #         else:
-    #             node.latest_start = node.earliest_start
-    #
-    #         for activity in node.outbound_activities:
-    #             if type(activity) is Activity:
-    #                 activity.total_float = (
-    #                     self._activities[activity.id].end_node.latest_start - activity.duration - node.earliest_start
-    #                 )
-    #                 activity.free_float = (
-    #                     self._activities[activity.id].end_node.earliest_start - activity.duration - node.earliest_start
-    #                 )
 
     @override
     def __repr__(self) -> str:
