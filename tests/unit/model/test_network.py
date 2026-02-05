@@ -1,5 +1,7 @@
+import pytest
+
 from aoa.model.activity import Activity
-from aoa.model.network import Network
+from aoa.model.network import AllocationException, Network
 from aoa.model.node import Node
 
 
@@ -167,3 +169,35 @@ def test_multiple_end_nodes() -> None:
     assert "2" in node_start_dependencies
     assert "3" in node_start_dependencies
     assert "1-4-5" in node_start_dependencies
+
+
+def test_overconstraining() -> None:
+
+    activities = [
+        Activity(
+            id=1,
+            effort=10,
+        ),
+        Activity(
+            id=2,
+            effort=1,
+        ),
+        Activity(
+            id=3,
+            effort=1,
+            predecessors={2},
+        ),
+        Activity(
+            id=4,
+            effort=1,
+            predecessors={3},
+        ),
+        Activity(
+            id=5,
+            effort=1,
+            predecessors={2, 3},
+        ),
+    ]
+
+    with pytest.raises(AllocationException):
+        _ = Network(activities)

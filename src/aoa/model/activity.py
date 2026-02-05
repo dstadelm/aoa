@@ -19,6 +19,7 @@ class Activity:
     owner: str = field(default="", eq=False)
     activity: str = field(default="", eq=False)
     predecessors: set[int] = field(factory=set, eq=False)
+    downstream_predecessors: set[int] = field(factory=set, eq=False)
     state: State = field(default=State.OPEN, eq=False)
     earliest_start: float = field(default=0.0, eq=False)
     latest_finish: float = field(default=0.0, eq=False)

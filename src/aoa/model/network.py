@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import copy
+from collections import OrderedDict
 from collections.abc import Generator
 from dataclasses import dataclass
 from functools import cached_property
@@ -12,6 +12,14 @@ from more_itertools import powerset
 from .activity import Activity, DummyActivity
 from .node import Node
 from .node_dict import NodeDict
+
+
+class AoAException(Exception):
+    """Base class exception for AOA."""
+
+
+class AllocationException(AoAException):
+    """Exception for allocation sequence errors"""
 
 
 @dataclass
@@ -31,7 +39,6 @@ class Network:
     def __init__(self, activities: list[Activity]):
         self.node_dict: NodeDict = NodeDict()
         self.activities: list[Activity] = activities
-        self.activities_by_id: dict[int, Activity] = dict()
 
         self._activity_node_lut: dict[int, ActivityNodes] = dict()
 
@@ -41,9 +48,12 @@ class Network:
         self.start_node: Node = Node(next(self.node_id))
         self.end_node: Node | None = None
 
-        allocation_sequence = self._get_allocation_sequence(activities, list(), set())
+        activities_by_id = {activity.id: activity for activity in activities}
+
+        allocation_sequence = self._get_allocation_sequence(activities_by_id, OrderedDict())
+        self._check_for_overconstraining(allocation_sequence)
+
         for activity in allocation_sequence:
-            self.activities_by_id[activity.id] = activity
             self._allocate_activity(activity)
         self._tie_end_node()
         self._renumber_nodes()
@@ -139,7 +149,7 @@ class Network:
         return [subset for id in id_set for subset in self._reverse_predecessor_lut[id]]
 
     def _get_allocation_sequence(
-        self, activities: list[Activity], allocated_activities: list[Activity], allocated_ids: set[int]
+        self, unallocated_activities: dict[int, Activity], allocated_activities: OrderedDict[int, Activity]
     ) -> list[Activity]:
         """Recursive Function to determine a sequence in which the activities can be allocated.
 
@@ -154,30 +164,33 @@ class Network:
         Returns:
             list[Activity]: The list of activities in the order of allocation
         """
-        if not activities:
-            return allocated_activities
+        if not unallocated_activities:
+            return list(allocated_activities.values())
 
-        allocateable_activities: list[Activity] = []
-        allocateable_activity_ids: list[set[int]] = list()
-        unallocateable_activities: list[Activity] = []
+        allocated_set = set(allocated_activities.keys())
+        for id, activity in unallocated_activities.items():
+            if activity.predecessors.issubset(allocated_set):
+                self._update_downstream_predecessors(activity, allocated_activities)
+                allocated_activities[id] = activity
+                del unallocated_activities[id]
+                return self._get_allocation_sequence(unallocated_activities, allocated_activities)
 
-        for activity in activities:
-            if activity.predecessors.issubset(allocated_ids):
-                allocateable_activities.append(activity)
-                allocateable_activity_ids.append({activity.id})
-            else:
-                unallocateable_activities.append(activity)
-
-        sorted_allocateable_activies = sorted(allocateable_activities, key=lambda x: len(x.predecessors))
-        if len(activities) == len(unallocateable_activities):
-            raise Exception("Unable to find allocation sequence")
-
-        return self._get_allocation_sequence(
-            unallocateable_activities,
-            allocated_activities + sorted_allocateable_activies,
-            allocated_ids.union(*allocateable_activity_ids),
+        raise AllocationException(
+            f"Activities {unallocated_activities.keys()}, can't be allocated as ther depencecies can't be resolved"
         )
 
+    def _update_downstream_predecessors(self, activity: Activity, activity_repository: OrderedDict[int, Activity]):
+        for predecessor_id in activity.predecessors:
+            activity.downstream_predecessors.update(activity_repository[predecessor_id].predecessors)
+            activity.downstream_predecessors.update(activity_repository[predecessor_id].downstream_predecessors)
+
+    def _check_for_overconstraining(self, allocation_sequence: list[Activity]) -> None:
+        for activity in allocation_sequence:
+            intersection = activity.predecessors.intersection(activity.downstream_predecessors)
+            if intersection:
+                raise AllocationException(
+                    f"Downstream activcities {intersection} detected as direct predecessors of activity {activity.id}"
+                )
 
     @override
     def __repr__(self) -> str:
