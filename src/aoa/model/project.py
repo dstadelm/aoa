@@ -8,6 +8,7 @@ from attr import define, field
 
 from .activity import Activity
 from .milestones import Milestone
+from .network import Network
 from .resources import Resource
 from .state import State
 
@@ -47,8 +48,8 @@ class Project:
 
 
 def deserialize_project(project_dict: ProjectDictType) -> Project:
-    print(project_dict)
-    return cattrs.structure(project_dict, Project)
+    project = cattrs.structure(project_dict, Project)
+    return project
 
 
 def load_yaml_project(config: Path) -> Project:
