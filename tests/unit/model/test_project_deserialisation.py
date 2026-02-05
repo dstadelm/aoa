@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pytest
+
 from aoa.model.project import ProjectDictType, deserialize_project
 from aoa.model.state import State
 

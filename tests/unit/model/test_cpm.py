@@ -20,8 +20,9 @@ def test_earliest_start_calculation() -> None:
 
     network = Network(activities)
     _calculate_earliest_start(network)
-    assert activities[0].earliest_start == 0
-    assert activities[1].earliest_start == activities[0].effort
+    annotated_activities = network.activities
+    assert annotated_activities[0].earliest_start == 0
+    assert annotated_activities[1].earliest_start == activities[0].effort
 
 
 def test_latest_finish_calculation() -> None:
@@ -54,7 +55,7 @@ def test_latest_finish_calculation() -> None:
     network = Network(activities)
     _calculate_latest_finish(network)
     activity_id_lut: dict[int, Activity | DummyActivity] = {}
-    for activity in activities:
+    for activity in network.activities:
         activity_id_lut[activity.id] = activity
     assert activity_id_lut[1].latest_finish == 10
     assert activity_id_lut[2].latest_finish == 6
@@ -83,7 +84,7 @@ def test_total_float() -> None:
     network = Network(activities)
     _calculate_latest_finish(network)
     activity_id_lut: dict[int, Activity | DummyActivity] = {}
-    for activity in activities:
+    for activity in network.activities:
         activity_id_lut[activity.id] = activity
 
     assert activity_id_lut[2].total_float == 7
@@ -111,7 +112,7 @@ def test_free_float() -> None:
     network = Network(activities)
     _calculate_free_float(network)
     activity_id_lut: dict[int, Activity | DummyActivity] = {}
-    for activity in activities:
+    for activity in network.activities:
         activity_id_lut[activity.id] = activity
 
     assert activity_id_lut[2].free_float == 0

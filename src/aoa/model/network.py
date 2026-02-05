@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Generator
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import cached_property
 from typing import override
@@ -16,6 +17,10 @@ from .node_dict import NodeDict
 
 class AoAException(Exception):
     """Base class exception for AOA."""
+
+
+class NonUniqueIdException(AoAException):
+    """Exception throwed when ID's are detected that aren't unique"""
 
 
 class AllocationException(AoAException):
@@ -38,7 +43,6 @@ def id_generator(start: int = -1, increment: int = 1) -> Generator[int, None, No
 class Network:
     def __init__(self, activities: list[Activity]):
         self.node_dict: NodeDict = NodeDict()
-        self.activities: list[Activity] = activities
 
         self._activity_node_lut: dict[int, ActivityNodes] = dict()
 
@@ -48,12 +52,8 @@ class Network:
         self.start_node: Node = Node(next(self.node_id))
         self.end_node: Node | None = None
 
-        activities_by_id = {activity.id: activity for activity in activities}
-
-        allocation_sequence = self._get_allocation_sequence(activities_by_id, OrderedDict())
-        self._check_for_overconstraining(allocation_sequence)
-
-        for activity in allocation_sequence:
+        self.activities = self._get_allocation_sequence(deepcopy(activities), OrderedDict())
+        for activity in self.activities:
             self._allocate_activity(activity)
         self._tie_end_node()
         self._renumber_nodes()
@@ -149,7 +149,7 @@ class Network:
         return [subset for id in id_set for subset in self._reverse_predecessor_lut[id]]
 
     def _get_allocation_sequence(
-        self, unallocated_activities: dict[int, Activity], allocated_activities: OrderedDict[int, Activity]
+        self, unallocated_activities: list[Activity], allocated_activities: OrderedDict[int, Activity]
     ) -> list[Activity]:
         """Recursive Function to determine a sequence in which the activities can be allocated.
 
@@ -168,29 +168,35 @@ class Network:
             return list(allocated_activities.values())
 
         allocated_set = set(allocated_activities.keys())
-        for id, activity in unallocated_activities.items():
+        for idx, activity in enumerate(unallocated_activities):
+            id = activity.id
+            self._check_id_uniqueness(id, set(allocated_activities.keys()))
             if activity.predecessors.issubset(allocated_set):
                 self._update_downstream_predecessors(activity, allocated_activities)
+                self._check_for_overconstraining(activity)
                 allocated_activities[id] = activity
-                del unallocated_activities[id]
+                del unallocated_activities[idx]
                 return self._get_allocation_sequence(unallocated_activities, allocated_activities)
 
         raise AllocationException(
-            f"Activities {unallocated_activities.keys()}, can't be allocated as ther depencecies can't be resolved"
+            f"Activities {[activity.id for activity in unallocated_activities]}, can't be allocated as ther depencecies can't be resolved"
         )
+
+    def _check_id_uniqueness(self, new_id: int, allocated_ids: set[int]) -> None:
+        if new_id in allocated_ids:
+            raise NonUniqueIdException(f"Duplicate activity ID[{new_id}] found")
 
     def _update_downstream_predecessors(self, activity: Activity, activity_repository: OrderedDict[int, Activity]):
         for predecessor_id in activity.predecessors:
             activity.downstream_predecessors.update(activity_repository[predecessor_id].predecessors)
             activity.downstream_predecessors.update(activity_repository[predecessor_id].downstream_predecessors)
 
-    def _check_for_overconstraining(self, allocation_sequence: list[Activity]) -> None:
-        for activity in allocation_sequence:
-            intersection = activity.predecessors.intersection(activity.downstream_predecessors)
-            if intersection:
-                raise AllocationException(
-                    f"Downstream activcities {intersection} detected as direct predecessors of activity {activity.id}"
-                )
+    def _check_for_overconstraining(self, activity: Activity) -> None:
+        intersection = activity.predecessors.intersection(activity.downstream_predecessors)
+        if intersection:
+            raise AllocationException(
+                f"Downstream activcities {intersection} detected as direct predecessors of activity {activity.id}"
+            )
 
     @override
     def __repr__(self) -> str:

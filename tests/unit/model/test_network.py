@@ -1,7 +1,7 @@
 import pytest
 
 from aoa.model.activity import Activity
-from aoa.model.network import AllocationException, Network
+from aoa.model.network import AllocationException, Network, NonUniqueIdException
 from aoa.model.node import Node
 
 
@@ -200,4 +200,14 @@ def test_overconstraining() -> None:
     ]
 
     with pytest.raises(AllocationException):
+        _ = Network(activities)
+
+
+def test_validate_unique_activity_ids() -> None:
+    activities = [
+        Activity(id=1),
+        Activity(id=1),
+    ]
+
+    with pytest.raises(NonUniqueIdException, match=r"Duplicate activity ID\[1] found"):
         _ = Network(activities)
