@@ -41,6 +41,14 @@ def id_generator(start: int = -1, increment: int = 1) -> Generator[int, None, No
 
 
 class Network:
+    """Class that creates a network of nodes and activities based on the provided activities.
+    Arguments:
+        activities (list[Activity]): The list of activities to create the network from
+    Raises:
+        AllocationException: When the activities can't be allocated due to cyclic dependencies or overconstraining
+        NonUniqueIdException: When duplicate activity ID's are detected in the provided activities
+    """
+
     def __init__(self, activities: list[Activity]):
         self.node_dict: NodeDict = NodeDict()
 
@@ -52,7 +60,8 @@ class Network:
         self.start_node: Node = Node(next(self.node_id))
         self.end_node: Node | None = None
 
-        self.activities = self._get_allocation_sequence(deepcopy(activities), OrderedDict())
+        self._check_no_cycles_exist(deepcopy(activities))
+        self.activities: list[Activity] = self._get_allocation_sequence(deepcopy(activities), OrderedDict())
         for activity in self.activities:
             self._allocate_activity(activity)
         self._tie_end_node()
@@ -182,14 +191,28 @@ class Network:
             f"Activities {[activity.id for activity in unallocated_activities]}, can't be allocated as ther depencecies can't be resolved"
         )
 
-    def _check_id_uniqueness(self, new_id: int, allocated_ids: set[int]) -> None:
-        if new_id in allocated_ids:
-            raise NonUniqueIdException(f"Duplicate activity ID[{new_id}] found")
-
     def _update_downstream_predecessors(self, activity: Activity, activity_repository: OrderedDict[int, Activity]):
+        """Update the downstream predecessors for the provided activity based on its direct predecessors.
+
+        Arguments:
+            activity (Activity): The activity to update the downstream predecessors for
+            activity_repository (OrderedDict[int, Activity]): The repository of already allocated activities
+        """
         for predecessor_id in activity.predecessors:
             activity.downstream_predecessors.update(activity_repository[predecessor_id].predecessors)
             activity.downstream_predecessors.update(activity_repository[predecessor_id].downstream_predecessors)
+
+    def _check_id_uniqueness(self, new_id: int, allocated_ids: set[int]) -> None:
+        """Check that the provided id is unique in the set of allocated ids.
+
+        Arguments:
+            new_id (int): The new id to check
+            allocated_ids (set[int]): The set of already allocated ids
+        Raises:
+            NonUniqueIdException: When the new id is already in the set of allocated ids
+        """
+        if new_id in allocated_ids:
+            raise NonUniqueIdException(f"Duplicate activity ID[{new_id}] found")
 
     def _check_for_overconstraining(self, activity: Activity) -> None:
         intersection = activity.predecessors.intersection(activity.downstream_predecessors)
@@ -197,6 +220,59 @@ class Network:
             raise AllocationException(
                 f"Downstream activcities {intersection} detected as direct predecessors of activity {activity.id}"
             )
+
+    def _check_no_cycles_exist(self, activities: list[Activity]) -> None:
+        """Check that no cycles exist in the provided activities.
+
+        A cycle exists when an activity is both a predecessor and a downstream predecessor of another activity.
+
+        Arguments:
+            activities (list[Activity]): The list of activities to check
+        """
+        activity_dict = {activity.id: activity for activity in activities}
+        for activity in activity_dict.values():
+            visited: set[int] = set()
+
+            def visit(act: Activity) -> None:
+                if act.id in visited:
+                    pruned = self.prune_involved(visited, activity_dict)
+                    message = ", ".join([f"ID[{id}]" for id in pruned])
+                    raise AllocationException(f"Cycle detected in the network involving activities {message}")
+                visited.add(act.id)
+                for pred_id in act.predecessors:
+                    visit(activity_dict[pred_id])
+
+            visit(activity)
+
+    def prune_involved(self, involved: set[int], activity_dict: dict[int, Activity]) -> set[int]:
+        """Prune the involved set by removing activities that have no predecessors recursively.
+
+        Given activities A, B, C, D and E where A has no predecessors, B has A as predecessor C has B and E as
+        predecessor, D has C as predecessor and E has D as predecessor. The involved set is {A, B, C, D, E}. Pruning
+        this set will remove A first as it has no predecessors resulting in the set {B, C, D, E}. B will then be
+        modified to by removing A as predecessor resulting in B having no predecessors. Pruning will then remove B
+        resulting in the set {C, D, E}. B will be removed from C but C will still have E as predecessor so it won't be
+        removed. The final pruned set will be {C, D, E}.
+
+        Arguments:
+            involved (set[int]): The set of involved activity ids
+            activity_dict (dict[int, Activity]): The dictionary of activities by id
+        Returns:
+            set[int]: The pruned set of involved activity ids
+
+        """
+        pruned = involved.copy()
+        for act_id in involved:
+            activity = activity_dict[act_id]
+            if not activity.predecessors:
+                pruned.discard(act_id)
+                for activity in activity_dict.values():
+                    activity.predecessors.discard(act_id)
+
+        if pruned != involved:
+            return self.prune_involved(pruned, activity_dict)
+        else:
+            return pruned
 
     @override
     def __repr__(self) -> str:

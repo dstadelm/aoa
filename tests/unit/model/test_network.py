@@ -211,3 +211,17 @@ def test_validate_unique_activity_ids() -> None:
 
     with pytest.raises(NonUniqueIdException, match=r"Duplicate activity ID\[1] found"):
         _ = Network(activities)
+
+
+def test_validate_cycle_detection() -> None:
+    activities = [
+        Activity(id=0),
+        Activity(id=1, predecessors={0, 3}),
+        Activity(id=2, predecessors={1}),
+        Activity(id=3, predecessors={2}),
+    ]
+
+    with pytest.raises(
+        AllocationException, match=r"Cycle detected in the network involving activities ID\[1], ID\[2], ID\[3]"
+    ):
+        _ = Network(activities)
