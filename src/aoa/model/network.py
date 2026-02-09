@@ -53,6 +53,7 @@ class Network:
         self.node_dict: NodeDict = NodeDict()
 
         self._activity_node_lut: dict[int, ActivityNodes] = dict()
+        self._downstream_predecessor_lut: dict[int, set[int]] = dict()
 
         self.node_id: Generator[int, None, None] = id_generator(start=-1, increment=1)
         self.dummy_activity_id: Generator[int, None, None] = id_generator(start=0, increment=-1)
@@ -199,8 +200,13 @@ class Network:
             activity_repository (OrderedDict[int, Activity]): The repository of already allocated activities
         """
         for predecessor_id in activity.predecessors:
-            activity.downstream_predecessors.update(activity_repository[predecessor_id].predecessors)
-            activity.downstream_predecessors.update(activity_repository[predecessor_id].downstream_predecessors)
+
+            self._downstream_predecessor_lut.setdefault(predecessor_id, set()).update(
+                activity_repository[predecessor_id].predecessors
+            )
+            self._downstream_predecessor_lut.setdefault(predecessor_id, set()).update(
+                self._downstream_predecessor_lut.get(predecessor_id, set())
+            )
 
     def _check_id_uniqueness(self, new_id: int, allocated_ids: set[int]) -> None:
         """Check that the provided id is unique in the set of allocated ids.
@@ -215,7 +221,7 @@ class Network:
             raise NonUniqueIdException(f"Duplicate activity ID[{new_id}] found")
 
     def _check_for_overconstraining(self, activity: Activity) -> None:
-        intersection = activity.predecessors.intersection(activity.downstream_predecessors)
+        intersection = self._downstream_predecessor_lut.get(activity.id, set()).intersection(activity.predecessors)
         if intersection:
             raise AllocationException(
                 f"Downstream activcities {intersection} detected as direct predecessors of activity {activity.id}"
