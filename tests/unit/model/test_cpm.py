@@ -1,4 +1,4 @@
-from aoa.model.activity import Activity, DummyActivity
+from aoa.model.activity import Activity, ActivityCollection, DummyActivity
 from aoa.model.cpm import _calculate_earliest_start  # pyright: ignore [reportPrivateUsage]
 from aoa.model.cpm import _calculate_free_float  # pyright: ignore [reportPrivateUsage]
 from aoa.model.cpm import _calculate_latest_finish  # pyright: ignore [reportPrivateUsage]
@@ -18,7 +18,7 @@ def test_earliest_start_calculation() -> None:
         ),
     ]
 
-    network = Network(activities)
+    network = Network(ActivityCollection(activities))
     _calculate_earliest_start(network)
     annotated_activities = network.activities
     assert annotated_activities[0].earliest_start == 0
@@ -52,7 +52,7 @@ def test_latest_finish_calculation() -> None:
         ),
     ]
 
-    network = Network(activities)
+    network = Network(ActivityCollection(activities))
     _calculate_latest_finish(network)
     activity_id_lut: dict[int, Activity | DummyActivity] = {}
     for activity in network.activities:
@@ -81,7 +81,7 @@ def test_total_float() -> None:
         ),
     ]
 
-    network = Network(activities)
+    network = Network(ActivityCollection(activities))
     _calculate_latest_finish(network)
     activity_id_lut: dict[int, Activity | DummyActivity] = {}
     for activity in network.activities:
@@ -109,7 +109,7 @@ def test_free_float() -> None:
         ),
     ]
 
-    network = Network(activities)
+    network = Network(ActivityCollection(activities))
     _calculate_free_float(network)
     activity_id_lut: dict[int, Activity | DummyActivity] = {}
     for activity in network.activities:

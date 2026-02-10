@@ -1,7 +1,9 @@
+from dataclasses import dataclass
 from typing import override
 
 from attr import define, field
 
+from .exception import NonUniqueIdException
 from .state import State
 
 
@@ -9,6 +11,14 @@ from .state import State
 class ActivityProtocol:
     id: int
     predecessors: set[int]
+    effort: float
+    duration: float
+    earliest_start: float
+    latest_finish: float
+    ealiest_finish: float
+    latest_start: float
+    total_float: float
+    free_float: float
 
 
 @define
@@ -69,3 +79,21 @@ class DummyActivity:
     @property
     def free_float(self) -> float:
         return 0.0
+
+
+@dataclass
+class ActivityCollection(dict[int, Activity]):
+
+    def __init__(self, activities: list[Activity]):
+        check_for_unique_ids(activities)
+        super().__init__((activity.id, activity) for activity in activities)
+
+
+def check_for_unique_ids(activities: list[Activity]) -> None:
+    """Checks that all activity IDs are unique. Raises a ValueError if duplicate IDs are found."""
+    activity_ids = [activity.id for activity in activities]
+    if len(activity_ids) != len(set(activity_ids)):
+        duplicate_ids = [
+            "ID[" + str(activity_id) + "]" for activity_id in set(activity_ids) if activity_ids.count(activity_id) > 1
+        ]
+        raise NonUniqueIdException("Activity IDs must be unique. Duplicate IDs found: " + ", ".join(duplicate_ids))

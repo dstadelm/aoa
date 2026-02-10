@@ -1,6 +1,6 @@
 from datetime import date
 
-from aoa.model.activity import Activity
+from aoa.model.activity import Activity, ActivityCollection
 from aoa.model.cpm import calculate_cpm
 from aoa.model.network import Network
 from aoa.transform.gantt import create_gantt
@@ -29,7 +29,7 @@ def test_simple_diamond_pert() -> None:
         ),
     ]
 
-    network = Network(activities)
+    network = Network(ActivityCollection(activities))
     calculate_cpm(network)
     plantuml = PlantUml(network)
     result = plantuml.get_txt()
@@ -92,7 +92,7 @@ def test_simple_gantt() -> None:
         ),
     ]
 
-    network = Network(activities)
+    network = Network(ActivityCollection(activities))
     calculate_cpm(network)
     result = create_gantt(activities, milestones=[], start_date=date.fromisoformat("2024-01-01"))
     assert (

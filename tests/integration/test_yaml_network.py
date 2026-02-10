@@ -27,7 +27,7 @@ activities:
     )
     project = load_yaml_project(Path("network.yaml"))
 
-    network = Network(project.activities)
+    network = Network(project.get_activities())
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 11
     assert nodes[0].outbound_activities == [

@@ -3,28 +3,16 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Generator
-from copy import deepcopy
 from dataclasses import dataclass
 from functools import cached_property
 from typing import override
 
 from more_itertools import powerset
 
-from .activity import Activity, DummyActivity
+from .activity import Activity, ActivityCollection, DummyActivity
+from .exception import AllocationException
 from .node import Node
 from .node_dict import NodeDict
-
-
-class AoAException(Exception):
-    """Base class exception for AOA."""
-
-
-class NonUniqueIdException(AoAException):
-    """Exception throwed when ID's are detected that aren't unique"""
-
-
-class AllocationException(AoAException):
-    """Exception for allocation sequence errors"""
 
 
 @dataclass
@@ -49,20 +37,20 @@ class Network:
         NonUniqueIdException: When duplicate activity ID's are detected in the provided activities
     """
 
-    def __init__(self, activities: list[Activity]):
+    def __init__(self, activities: ActivityCollection):
         self.node_dict: NodeDict = NodeDict()
 
         self._activity_node_lut: dict[int, ActivityNodes] = dict()
-        self._downstream_predecessor_lut: dict[int, set[int]] = dict()
 
-        self.node_id: Generator[int, None, None] = id_generator(start=-1, increment=1)
-        self.dummy_activity_id: Generator[int, None, None] = id_generator(start=0, increment=-1)
+        self._node_id: Generator[int, None, None] = id_generator(start=-1, increment=1)
+        self._dummy_activity_id: Generator[int, None, None] = id_generator(start=0, increment=-1)
 
-        self.start_node: Node = Node(next(self.node_id))
+        self.start_node: Node = Node(next(self._node_id))
         self.end_node: Node | None = None
 
-        self._check_no_cycles_exist(deepcopy(activities))
-        self.activities: list[Activity] = self._get_allocation_sequence(deepcopy(activities), OrderedDict())
+        self._check_no_cycles_exist(activities)
+        self._check_for_overconstraining(activities)
+        self.activities: list[Activity] = self._get_allocation_sequence(activities)
         for activity in self.activities:
             self._allocate_activity(activity)
         self._tie_end_node()
@@ -137,8 +125,8 @@ class Network:
                 _reverse_predecessor_lut.setdefault(id, []).append(activity.predecessors)
         return _reverse_predecessor_lut
 
-    def _get_sets_that_contain_ids_in_set(self, id_set: set[int]) -> list[set[int]]:
-        """For a given set of ids returns all all sets that contain any one of those ids.
+    def _get_sets_that_contain_ids_in_id_set(self, id_set: set[int]) -> list[set[int]]:
+        """For a given set of ids returns all sets that contain any one of those ids.
 
         Where a set is a group of activities which are together the predecessors of an activity
 
@@ -158,76 +146,66 @@ class Network:
 
         return [subset for id in id_set for subset in self._reverse_predecessor_lut[id]]
 
-    def _get_allocation_sequence(
-        self, unallocated_activities: list[Activity], allocated_activities: OrderedDict[int, Activity]
-    ) -> list[Activity]:
-        """Recursive Function to determine a sequence in which the activities can be allocated.
+    def _get_allocation_sequence(self, activities: ActivityCollection) -> list[Activity]:
+        allocated_activities: OrderedDict[int, Activity] = OrderedDict()
 
-        An activity can be allocated, when all activities which the activity depends on have been allocated. Returns a
-        list of activities in the order of allocation of the activities
+        def get_allocation_sequence_recursion(
+            unallocated_activities: ActivityCollection,
+        ) -> list[Activity]:
+            """Recursive Function to determine a sequence in which the activities can be allocated.
 
-        Arguments:
-            activities (list[Activity]): The list of activities to allocate
-            allocated_activities (list[Activity]): The list of already allocated activities
-            allocated_ids (set[int]): The set of already allocated activity ids
+            An activity can be allocated, when all activities which the activity depends on have been allocated.
 
-        Returns:
-            list[Activity]: The list of activities in the order of allocation
-        """
-        if not unallocated_activities:
-            return list(allocated_activities.values())
+            Arguments:
+                unallocated_activities (list[Activity]): The list of activities to allocate
 
-        allocated_set = set(allocated_activities.keys())
-        for idx, activity in enumerate(unallocated_activities):
-            id = activity.id
-            self._check_id_uniqueness(id, set(allocated_activities.keys()))
-            if activity.predecessors.issubset(allocated_set):
-                self._update_downstream_predecessors(activity, allocated_activities)
-                self._check_for_overconstraining(activity)
-                allocated_activities[id] = activity
-                del unallocated_activities[idx]
-                return self._get_allocation_sequence(unallocated_activities, allocated_activities)
+            Returns:
+                list[Activity]: The list of activities in the order of allocation
+            """
+            if not unallocated_activities:
+                return list(allocated_activities.values())
 
-        raise AllocationException(
-            f"Activities {[activity.id for activity in unallocated_activities]}, can't be allocated as ther depencecies can't be resolved"
-        )
+            allocated_set = set(allocated_activities.keys())
+            for idx, activity in unallocated_activities.items():
+                id: int = activity.id
+                if activity.predecessors.issubset(allocated_set):
+                    allocated_activities[id] = activity
+                    del unallocated_activities[idx]
+                    return get_allocation_sequence_recursion(unallocated_activities)
 
-    def _update_downstream_predecessors(self, activity: Activity, activity_repository: OrderedDict[int, Activity]):
-        """Update the downstream predecessors for the provided activity based on its direct predecessors.
-
-        Arguments:
-            activity (Activity): The activity to update the downstream predecessors for
-            activity_repository (OrderedDict[int, Activity]): The repository of already allocated activities
-        """
-        for predecessor_id in activity.predecessors:
-
-            self._downstream_predecessor_lut.setdefault(predecessor_id, set()).update(
-                activity_repository[predecessor_id].predecessors
-            )
-            self._downstream_predecessor_lut.setdefault(predecessor_id, set()).update(
-                self._downstream_predecessor_lut.get(predecessor_id, set())
-            )
-
-    def _check_id_uniqueness(self, new_id: int, allocated_ids: set[int]) -> None:
-        """Check that the provided id is unique in the set of allocated ids.
-
-        Arguments:
-            new_id (int): The new id to check
-            allocated_ids (set[int]): The set of already allocated ids
-        Raises:
-            NonUniqueIdException: When the new id is already in the set of allocated ids
-        """
-        if new_id in allocated_ids:
-            raise NonUniqueIdException(f"Duplicate activity ID[{new_id}] found")
-
-    def _check_for_overconstraining(self, activity: Activity) -> None:
-        intersection = self._downstream_predecessor_lut.get(activity.id, set()).intersection(activity.predecessors)
-        if intersection:
             raise AllocationException(
-                f"Downstream activcities {intersection} detected as direct predecessors of activity {activity.id}"
+                f"Activities {[activity.id for activity in unallocated_activities.values()]}, can't be allocated as ther depencecies can't be resolved"
             )
 
-    def _check_no_cycles_exist(self, activities: list[Activity]) -> None:
+        return get_allocation_sequence_recursion(activities)
+
+    def _check_for_overconstraining(self, activities: ActivityCollection) -> None:
+        """Check that no overconstraining exists in the provided activities.
+
+        Overconstraining exists when an activity is a direct predecessor of another activity but also a downstream predecessor of the same activity.
+
+        Arguments:
+            activities (list[Activity]): The list of activities to check
+        """
+        downstream_predecessor_lut: dict[int, set[int]] = dict()
+
+        for activity in activities.values():
+            # update downstream predecessors
+            for predecessor_id in activity.predecessors:
+
+                downstream_predecessor_lut.setdefault(predecessor_id, set()).update(
+                    activities[predecessor_id].predecessors
+                )
+                downstream_predecessor_lut.setdefault(predecessor_id, set()).update(
+                    downstream_predecessor_lut.get(predecessor_id, set())
+                )
+            intersection = downstream_predecessor_lut.get(activity.id, set()).intersection(activity.predecessors)
+            if intersection:
+                raise AllocationException(
+                    f"Downstream activcities {intersection} detected as direct predecessors of activity {activity.id}"
+                )
+
+    def _check_no_cycles_exist(self, activities: ActivityCollection) -> None:
         """Check that no cycles exist in the provided activities.
 
         A cycle exists when an activity is both a predecessor and a downstream predecessor of another activity.
@@ -235,22 +213,21 @@ class Network:
         Arguments:
             activities (list[Activity]): The list of activities to check
         """
-        activity_dict = {activity.id: activity for activity in activities}
-        for activity in activity_dict.values():
+        for activity in activities.values():
             visited: set[int] = set()
 
             def visit(act: Activity) -> None:
                 if act.id in visited:
-                    pruned = self.prune_involved(visited, activity_dict)
+                    pruned = self.prune_involved(visited, activities)
                     message = ", ".join([f"ID[{id}]" for id in pruned])
                     raise AllocationException(f"Cycle detected in the network involving activities {message}")
                 visited.add(act.id)
                 for pred_id in act.predecessors:
-                    visit(activity_dict[pred_id])
+                    visit(activities[pred_id])
 
             visit(activity)
 
-    def prune_involved(self, involved: set[int], activity_dict: dict[int, Activity]) -> set[int]:
+    def prune_involved(self, involved: set[int], activities: ActivityCollection) -> set[int]:
         """Prune the involved set by removing activities that have no predecessors recursively.
 
         Given activities A, B, C, D and E where A has no predecessors, B has A as predecessor C has B and E as
@@ -269,14 +246,14 @@ class Network:
         """
         pruned = involved.copy()
         for act_id in involved:
-            activity = activity_dict[act_id]
+            activity = activities[act_id]
             if not activity.predecessors:
                 pruned.discard(act_id)
-                for activity in activity_dict.values():
+                for activity in activities.values():
                     activity.predecessors.discard(act_id)
 
         if pruned != involved:
-            return self.prune_involved(pruned, activity_dict)
+            return self.prune_involved(pruned, activities)
         else:
             return pruned
 
@@ -363,7 +340,7 @@ class Network:
             activity(Activity): The activity to attach to the start node
             start_node(Node): The start node to which the activity is attached
         """
-        end_node = Node(next(self.node_id), max_depth=start_node.max_depth + 1)
+        end_node = Node(next(self._node_id), max_depth=start_node.max_depth + 1)
         start_node.outbound_activities.append(activity)
         end_node.inbound_activities.append(activity)
         self._activity_node_lut[activity.id] = ActivityNodes(start_node, end_node)
@@ -379,7 +356,7 @@ class Network:
         Returns:
            set[int]: The updated id of the end node
         """
-        dummy_activity = DummyActivity(next(self.dummy_activity_id))
+        dummy_activity = DummyActivity(next(self._dummy_activity_id))
         start_node.outbound_activities.append(dummy_activity)
         end_node.inbound_activities.append(dummy_activity)
 
@@ -426,7 +403,7 @@ class Network:
             return predecessors
 
         mutable_node_id = predecessors.copy()
-        for pred_set in self._get_sets_that_contain_ids_in_set(predecessors):
+        for pred_set in self._get_sets_that_contain_ids_in_id_set(predecessors):
             if not predecessors.issubset(pred_set):
                 mutable_node_id.difference_update(pred_set)
             if not mutable_node_id:
@@ -475,7 +452,7 @@ class Network:
         tie_node = (
             self.node_dict[tie_node_id]
             if tie_node_id
-            else Node(next(self.node_id)) if dummy_link_start_nodes else self.start_node  # floating node
+            else Node(next(self._node_id)) if dummy_link_start_nodes else self.start_node  # floating node
         )
 
         for node in dummy_link_start_nodes:

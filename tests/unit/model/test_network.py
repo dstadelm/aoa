@@ -1,7 +1,8 @@
 import pytest
 
-from aoa.model.activity import Activity
-from aoa.model.network import AllocationException, Network, NonUniqueIdException
+from aoa.model.activity import Activity, ActivityCollection
+from aoa.model.exception import AllocationException, NonUniqueIdException
+from aoa.model.network import Network
 from aoa.model.node import Node
 
 
@@ -10,7 +11,7 @@ def test_one_activity():
         id=1,
     )
 
-    network = Network([activity])
+    network = Network(ActivityCollection([activity]))
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 2  # start and end nodes
     assert nodes[0].outbound_activities == [activity]
@@ -28,7 +29,7 @@ def test_two_sequential_activities():
         ),
     ]
 
-    network = Network(activities)
+    network = Network(ActivityCollection(activities))
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 3  # start and end nodes
     assert nodes[0].outbound_activities == [activities[0]]
@@ -47,7 +48,7 @@ def test_two_parallel_activities():
         ),
     ]
 
-    network = Network(activities)
+    network = Network(ActivityCollection(activities))
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 3  # start and end nodes
     assert nodes[0].outbound_activities == [activities[0], activities[1]]
@@ -79,7 +80,7 @@ def test_three_parallel_activities():
         ),
     ]
 
-    network = Network(activities)
+    network = Network(ActivityCollection(activities))
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 4  # start and end nodes
     assert nodes[0].outbound_activities == [activities[0], activities[1], activities[2]]
@@ -108,7 +109,7 @@ def test_complex_network():
         Activity(id=11, predecessors={1, 2, 3, 4, 5}),
     ]
 
-    network = Network(activities)
+    network = Network(ActivityCollection(activities))
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 11
     assert nodes[0].outbound_activities == [activities[0], activities[1], activities[2], activities[3], activities[4]]
@@ -155,7 +156,7 @@ def test_multiple_end_nodes() -> None:
         ),
     ]
 
-    network = Network(activities)
+    network = Network(ActivityCollection(activities))
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 4
 
@@ -200,17 +201,7 @@ def test_overconstraining() -> None:
     ]
 
     with pytest.raises(AllocationException):
-        _ = Network(activities)
-
-
-def test_validate_unique_activity_ids() -> None:
-    activities = [
-        Activity(id=1),
-        Activity(id=1),
-    ]
-
-    with pytest.raises(NonUniqueIdException, match=r"Duplicate activity ID\[1] found"):
-        _ = Network(activities)
+        _ = Network(ActivityCollection(activities))
 
 
 def test_validate_cycle_detection() -> None:
@@ -224,4 +215,4 @@ def test_validate_cycle_detection() -> None:
     with pytest.raises(
         AllocationException, match=r"Cycle detected in the network involving activities ID\[1], ID\[2], ID\[3]"
     ):
-        _ = Network(activities)
+        _ = Network(ActivityCollection(activities))

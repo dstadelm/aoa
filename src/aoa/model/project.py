@@ -6,10 +6,10 @@ import cattrs
 import yaml
 from attr import define, field
 
-from .activity import Activity
-from .milestones import Milestone
-from .network import Network
-from .resources import Resource
+from .activity import Activity, ActivityCollection
+from .exception import NonUniqueIdException
+from .milestones import Milestone, MilestoneCollection
+from .resources import Resource, ResourceCollection
 from .state import State
 
 
@@ -36,19 +36,28 @@ class Project:
     _activity_index: dict[int, Activity] = field(init=False, factory=dict, repr=False)
     _resource_index: dict[str, Resource] = field(init=False, factory=dict, repr=False)
 
-    def get_activity_by_id(self, activity_id: int) -> Activity | None:
-        if self._activity_index == {}:
-            self._activity_index = {activity.id: activity for activity in self.activities}
-        return self._activity_index.get(activity_id)
+    def get_activities(self) -> ActivityCollection:
+        return ActivityCollection(activities=self.activities)
 
-    def get_resource_by_id(self, resource_id: str) -> Resource | None:
-        if self._resource_index == {}:
-            self._resource_index = {resource.id: resource for resource in self.resources}
-        return self._resource_index.get(resource_id)
+    def get_resources(self) -> ResourceCollection:
+        return ResourceCollection(resources=self.resources)
+
+    def get_milestones(self) -> MilestoneCollection:
+        return MilestoneCollection(milestones=self.milestones)
+
+
+def check_for_unique_activity_ids(activities: list[Activity]) -> None:
+    activity_ids = [activity.id for activity in activities]
+    if len(activity_ids) != len(set(activity_ids)):
+        duplicate_ids = [activity_id for activity_id in set(activity_ids) if activity_ids.count(activity_id) > 1]
+        raise NonUniqueIdException(
+            "Activity IDs must be unique. Duplicate IDs found: " + ", ".join(str(id) for id in duplicate_ids)
+        )
 
 
 def deserialize_project(project_dict: ProjectDictType) -> Project:
     project = cattrs.structure(project_dict, Project)
+    check_for_unique_activity_ids(activities=project.activities)
     return project
 
 
