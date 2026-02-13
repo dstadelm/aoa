@@ -55,7 +55,6 @@ class Network:
             self._allocate_activity(activity)
         self._tie_end_node()
         self._renumber_nodes()
-        # self.calculate_latest_start(self.get_node_list_sorted_by_depth())
 
     def get_node_list_sorted_by_depth(self) -> list[Node]:
         """Iterate over all nodes and sort them by depth (depth of the graph from the root).
@@ -315,9 +314,6 @@ class Network:
                     # update the inbound activities and start dependencies
                     del self.node_dict[tie_node.start_dependencies]
                     tie_node.inbound_activities.append(activity)
-                    # tie_node.start_dependencies = tie_node.start_dependencies.union(
-                    #     self._activity_node_lut[activity.id].start_node.start_dependencies, {activity.id}
-                    # )
                     self.node_dict[tie_node.start_dependencies] = tie_node
 
                     self._activity_node_lut[activity.id].end_node = tie_node
@@ -410,10 +406,6 @@ class Network:
                 return None
 
         if mutable_node_id:
-            # if mutable_node_id not in self.node_dict:
-            #     contenders = [key for key in self.node_dict.keys() if mutable_node_id.issubset(key)]
-            #     sorted_contenders = sorted(contenders, key=lambda x: len(x))
-            #     mutable_node_id = set(sorted_contenders[0])
             return mutable_node_id
         else:
             return None
@@ -516,7 +508,6 @@ class Network:
                     self._activity_node_lut[activity.id].end_node = self.node_dict[head]
                     self.node_dict[head].inbound_activities.append(activity)
                 new_head = head.union(tail[0])
-                # self.node_dict[head].start_dependencies = new_head
                 self.node_dict[new_head] = self.node_dict[head]  # Update lookup with new key
                 _ = self.node_dict.pop(tail[0])
                 _ = self.node_dict.pop(head)
