@@ -1,15 +1,15 @@
 from dataclasses import dataclass, field
 from typing import override
 
-from .activity import Activity, DummyActivity
+from .activity import Activity
 
 
 @dataclass
 class Node:
     id: int
     is_end: bool = field(default=False, compare=False)
-    inbound_activities: list[Activity | DummyActivity] = field(default_factory=list, repr=False, compare=False)
-    outbound_activities: list[Activity | DummyActivity] = field(default_factory=list, repr=False, compare=False)
+    inbound_activities: list[Activity] = field(default_factory=list, repr=False, compare=False)
+    outbound_activities: list[Activity] = field(default_factory=list, repr=False, compare=False)
     max_depth: int = field(default=0, compare=False)
 
     @property

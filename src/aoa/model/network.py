@@ -9,7 +9,7 @@ from typing import override
 
 from more_itertools import powerset
 
-from .activity import Activity, ActivityCollection, DummyActivity
+from .activity import Activity, ActivityCollection
 from .exception import AllocationException
 from .node import Node
 from .node_dict import NodeDict
@@ -66,7 +66,7 @@ class Network:
         nodes += list(sorted(self.node_dict.values(), key=lambda x: x.id))
         return nodes
 
-    def get_activity_nodes(self, activity: Activity | DummyActivity) -> ActivityNodes:
+    def get_activity_nodes(self, activity: Activity) -> ActivityNodes:
         """Returns the start and end node for a given activity
 
         Arguments:
@@ -77,7 +77,7 @@ class Network:
         """
         return self._activity_node_lut[activity.id]
 
-    def get_activity_start_node(self, activity: Activity | DummyActivity) -> Node:
+    def get_activity_start_node(self, activity: Activity) -> Node:
         """Returns the start node for a given activity
 
         Arguments:
@@ -88,7 +88,7 @@ class Network:
         """
         return self._activity_node_lut[activity.id].start_node
 
-    def get_activity_end_node(self, activity: Activity | DummyActivity) -> Node:
+    def get_activity_end_node(self, activity: Activity) -> Node:
         """Returns the start node for a given activity
 
         Arguments:
@@ -352,7 +352,7 @@ class Network:
         Returns:
            set[int]: The updated id of the end node
         """
-        dummy_activity = DummyActivity(next(self._dummy_activity_id))
+        dummy_activity = Activity(next(self._dummy_activity_id))
         start_node.outbound_activities.append(dummy_activity)
         end_node.inbound_activities.append(dummy_activity)
 

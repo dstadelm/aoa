@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from aoa.model.activity import Activity, DummyActivity
+from aoa.model.activity import Activity
 from aoa.model.network import Network
 from aoa.model.node import Node
 
@@ -53,13 +53,13 @@ title Pert: Project Design
 
         return "\n".join(network)
 
-    def _line_fmt(self, activity: Activity | DummyActivity) -> str:
+    def _line_fmt(self, activity: Activity) -> str:
         if type(activity) is Activity:
             if activity.total_float == 0:
                 return "[thickness=4]"
             else:
                 return ""
-        if type(activity) is DummyActivity:
+        if activity.is_dummy:
             if (
                 self.network.get_activity_start_node(activity).earliest_start
                 == self.network.get_activity_end_node(activity).latest_start

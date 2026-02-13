@@ -54,36 +54,19 @@ class Activity:
     def total_float(self) -> float:
         return self.latest_start - self.earliest_start
 
-
-@define
-class DummyActivity:
-    id: int
-    predecessors: set[int] = field(factory=set, eq=False)
-    effort: float = field(default=0, eq=False)
-    duration: float = field(default=0, eq=False)
-    earliest_start: float = field(default=0, eq=False)
-    latest_finish: float = field(default=0, eq=False)
+    @property
+    def critical(self) -> bool:
+        """Returns true if the activity is on the critical path"""
+        return self.latest_finish == self.earliest_finish
 
     @property
-    def earliest_finish(self) -> float:
-        return self.earliest_start
-
-    @property
-    def latest_start(self) -> float:
-        return self.latest_finish
-
-    @property
-    def total_float(self) -> float:
-        return self.latest_start - self.earliest_start
-
-    @property
-    def free_float(self) -> float:
-        return 0.0
+    def is_dummy(self) -> bool:
+        """Returns true if the activity is a dummy activity (i.e., has zero effort and no resource)"""
+        return self.id < 0
 
 
 @dataclass
 class ActivityCollection(dict[int, Activity]):
-
     def __init__(self, activities: list[Activity]):
         check_for_unique_ids(activities)
         super().__init__((activity.id, activity) for activity in activities)

@@ -1,4 +1,4 @@
-from aoa.model.activity import Activity, ActivityCollection, DummyActivity
+from aoa.model.activity import Activity, ActivityCollection
 from aoa.model.cpm import _calculate_earliest_start  # pyright: ignore [reportPrivateUsage]
 from aoa.model.cpm import _calculate_free_float  # pyright: ignore [reportPrivateUsage]
 from aoa.model.cpm import _calculate_latest_finish  # pyright: ignore [reportPrivateUsage]
@@ -54,7 +54,7 @@ def test_latest_finish_calculation() -> None:
 
     network = Network(ActivityCollection(activities))
     _calculate_latest_finish(network)
-    activity_id_lut: dict[int, Activity | DummyActivity] = {}
+    activity_id_lut: dict[int, Activity] = {}
     for activity in network.activities:
         activity_id_lut[activity.id] = activity
     assert activity_id_lut[1].latest_finish == 10
@@ -83,7 +83,7 @@ def test_total_float() -> None:
 
     network = Network(ActivityCollection(activities))
     _calculate_latest_finish(network)
-    activity_id_lut: dict[int, Activity | DummyActivity] = {}
+    activity_id_lut: dict[int, Activity] = {}
     for activity in network.activities:
         activity_id_lut[activity.id] = activity
 
@@ -111,7 +111,7 @@ def test_free_float() -> None:
 
     network = Network(ActivityCollection(activities))
     _calculate_free_float(network)
-    activity_id_lut: dict[int, Activity | DummyActivity] = {}
+    activity_id_lut: dict[int, Activity] = {}
     for activity in network.activities:
         activity_id_lut[activity.id] = activity
 
