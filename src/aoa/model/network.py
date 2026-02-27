@@ -41,6 +41,7 @@ class Network:
         self.node_dict: NodeDict = NodeDict()
 
         self._activity_node_lut: dict[int, ActivityNodes] = dict()
+        self._dummy_activities: list[Activity] = []
 
         self._node_id: Generator[int, None, None] = id_generator(start=-1, increment=1)
         self._dummy_activity_id: Generator[int, None, None] = id_generator(start=0, increment=-1)
@@ -50,11 +51,20 @@ class Network:
 
         self._check_no_cycles_exist(activities)
         self._check_for_overconstraining(activities)
-        self.activities: list[Activity] = self._get_allocation_sequence(activities)
-        for activity in self.activities:
+        self._activities: list[Activity] = self._get_allocation_sequence(activities)
+        for activity in self._activities:
             self._allocate_activity(activity)
         self._tie_end_node()
         self._renumber_nodes()
+
+    @property
+    def activities(self) -> list[Activity]:
+        """Returns the list of activities in the network.
+
+        Returns:
+            list[Activity]: The list of activities in the network
+        """
+        return self._activities + self._dummy_activities
 
     def get_node_list_sorted_by_depth(self) -> list[Node]:
         """Iterate over all nodes and sort them by depth (depth of the graph from the root).
@@ -119,7 +129,7 @@ class Network:
     @cached_property
     def _reverse_predecessor_lut(self) -> dict[int, list[set[int]]]:
         _reverse_predecessor_lut: dict[int, list[set[int]]] = dict()
-        for activity in self.activities:
+        for activity in self._activities:
             for id in activity.predecessors:
                 _reverse_predecessor_lut.setdefault(id, []).append(activity.predecessors)
         return _reverse_predecessor_lut
@@ -368,6 +378,7 @@ class Network:
         if end_node.start_dependencies not in self.node_dict:
             self.node_dict[end_node.start_dependencies] = end_node
 
+        self._dummy_activities.append(dummy_activity)
         self._activity_node_lut[dummy_activity.id] = ActivityNodes(start_node, end_node)
         return end_node.start_dependencies
 
