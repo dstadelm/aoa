@@ -39,6 +39,9 @@ class NodeDict(MutableMapping[Set[int], Node]):
 
     @override
     def __setitem__(self, key: Set[int], value: Node) -> None:
+        # to make sure there are no duplicates in the dict, find entry where the node's id matches and delete it
+        if del_key := next((k for k, v in self.items() if v.id == value.id), None):
+            del self[del_key]
         self._store[self._norm_key(key)] = value
 
     @override
