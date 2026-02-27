@@ -19,6 +19,9 @@ class PlantUml:
             _ = f.write(self.get_txt())
 
     def _get_header(self) -> str:
+        polyline = "skinparam linetype polyline"
+        ortho = "skinparam linetype ortho"
+
         return """@startuml PERT
 top to bottom direction
 ' Horizontal lines: -->, <--, <-->
@@ -43,9 +46,9 @@ title Pert: Project Design
     def _get_network(self) -> str:
         network = [
             (
-                f"{self.network.get_activity_start_node(activity).id} -{self._line_fmt(activity)}-> {self.network.get_activity_end_node(activity).id} : {activity.activity} (Id={activity.id}, D={activity.duration}, TF={activity.total_float}, FF={activity.free_float})"
-                if type(activity) is Activity
-                else f"{self.network.get_activity_start_node(activity).id} -{self._line_fmt(activity)}-> {self.network.get_activity_end_node(activity).id}"
+                f"{self.network.get_activity_start_node(activity).id} -{self._line_fmt(activity)}-> {self.network.get_activity_end_node(activity).id}"
+                if activity.is_dummy is Activity
+                else f"{self.network.get_activity_start_node(activity).id} -{self._line_fmt(activity)}-> {self.network.get_activity_end_node(activity).id} : {activity.activity} (Id={activity.id}, D={activity.duration}, TF={activity.total_float}, FF={activity.free_float})"
             )
             for node in self.sorted_nodes
             for activity in node.outbound_activities
@@ -54,12 +57,12 @@ title Pert: Project Design
         return "\n".join(network)
 
     def _line_fmt(self, activity: Activity) -> str:
-        if type(activity) is Activity:
+        if not activity.is_dummy:
             if activity.total_float == 0:
                 return "[thickness=4]"
             else:
                 return ""
-        if activity.is_dummy:
+        else:
             if (
                 self.network.get_activity_start_node(activity).earliest_start
                 == self.network.get_activity_end_node(activity).latest_start

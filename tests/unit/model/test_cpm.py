@@ -55,7 +55,7 @@ def test_latest_finish_calculation() -> None:
     network = Network(ActivityCollection(activities))
     _calculate_latest_finish(network)
     activity_id_lut: dict[int, Activity] = {}
-    for activity in network.activities:
+    for activity in network._activities:
         activity_id_lut[activity.id] = activity
     assert activity_id_lut[1].latest_finish == 10
     assert activity_id_lut[2].latest_finish == 6
@@ -84,7 +84,7 @@ def test_total_float() -> None:
     network = Network(ActivityCollection(activities))
     _calculate_latest_finish(network)
     activity_id_lut: dict[int, Activity] = {}
-    for activity in network.activities:
+    for activity in network._activities:
         activity_id_lut[activity.id] = activity
 
     assert activity_id_lut[2].total_float == 7
@@ -112,7 +112,7 @@ def test_free_float() -> None:
     network = Network(ActivityCollection(activities))
     _calculate_free_float(network)
     activity_id_lut: dict[int, Activity] = {}
-    for activity in network.activities:
+    for activity in network._activities:
         activity_id_lut[activity.id] = activity
 
     assert activity_id_lut[2].free_float == 0
