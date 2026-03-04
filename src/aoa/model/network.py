@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Generator
-from dataclasses import dataclass
 from functools import cached_property
 from typing import override
 
@@ -11,21 +10,9 @@ from more_itertools import powerset
 
 from .activity import Activity, ActivityCollection
 from .exception import AllocationException
+from .id_generator import id_generator
 from .node import Node
-from .node_dict import NodeDict
-
-
-@dataclass
-class ActivityNodes:
-    start_node: Node
-    end_node: Node
-
-
-def id_generator(start: int = -1, increment: int = 1) -> Generator[int, None, None]:
-    current_id = start
-    while True:
-        current_id += increment
-        yield current_id
+from .node_dict import ActivityNodes, NodeDict
 
 
 class Network:
@@ -40,13 +27,10 @@ class Network:
     def __init__(self, activities: ActivityCollection):
         self.node_dict: NodeDict = NodeDict()
 
-        self._activity_node_lut: dict[int, ActivityNodes] = dict()
         self._dummy_activities: list[Activity] = []
 
-        self._node_id: Generator[int, None, None] = id_generator(start=-1, increment=1)
         self._dummy_activity_id: Generator[int, None, None] = id_generator(start=0, increment=-1)
 
-        self.start_node: Node = Node(next(self._node_id))
         self.end_node: Node | None = None
 
         self._check_no_cycles_exist(activities)
@@ -72,8 +56,7 @@ class Network:
         Returns:
             list[Node]: All nodes sorted by depth
         """
-        nodes = [self.start_node]
-        nodes += list(sorted(self.node_dict.values(), key=lambda x: x.id))
+        nodes = list(sorted(self.node_dict.values(), key=lambda x: x.id))
         return nodes
 
     def get_activity_nodes(self, activity: Activity) -> ActivityNodes:
@@ -85,7 +68,7 @@ class Network:
         Returns:
             ActivityNodes: The start and end node for the given activity
         """
-        return self._activity_node_lut[activity.id]
+        return self.node_dict.activity_node_lut[activity.id]
 
     def get_activity_start_node(self, activity: Activity) -> Node:
         """Returns the start node for a given activity
@@ -96,7 +79,7 @@ class Network:
         Returns:
             Node: The start node of the given activity
         """
-        return self._activity_node_lut[activity.id].start_node
+        return self.node_dict.activity_node_lut[activity.id].start_node
 
     def get_activity_end_node(self, activity: Activity) -> Node:
         """Returns the start node for a given activity
@@ -107,7 +90,7 @@ class Network:
         Returns:
             Node: The start node of the given activity
         """
-        return self._activity_node_lut[activity.id].end_node
+        return self.node_dict.activity_node_lut[activity.id].end_node
 
     @classmethod
     def power_subset(cls, predecessors: list[int]) -> list[set[int]]:
@@ -227,7 +210,7 @@ class Network:
 
             def visit(act: Activity) -> None:
                 if act.id in visited:
-                    pruned = self.prune_involved(visited, activities)
+                    pruned = self._prune_involved(visited, activities)
                     message = ", ".join([f"ID[{id}]" for id in pruned])
                     raise AllocationException(f"Cycle detected in the network involving activities {message}")
                 visited.add(act.id)
@@ -236,7 +219,7 @@ class Network:
 
             visit(activity)
 
-    def prune_involved(self, involved: set[int], activities: ActivityCollection) -> set[int]:
+    def _prune_involved(self, involved: set[int], activities: ActivityCollection) -> set[int]:
         """Prune the involved set by removing activities that have no predecessors recursively.
 
         Given activities A, B, C, D and E where A has no predecessors, B has A as predecessor C has B and E as
@@ -262,7 +245,7 @@ class Network:
                     activity.predecessors.discard(act_id)
 
         if pruned != involved:
-            return self.prune_involved(pruned, activities)
+            return self._prune_involved(pruned, activities)
         else:
             return pruned
 
@@ -286,11 +269,9 @@ class Network:
         if not self.end_node:
             raise Exception("Undefined end_node")
 
-        sorted_nodes: list[Node] = [self.start_node]
+        sorted_nodes: list[Node] = []
         for node in list(sorted(self.node_dict.values(), key=lambda x: x.max_depth)):
-            if node.id != self.end_node.id:
-                sorted_nodes.append(node)
-        sorted_nodes.append(self.end_node)
+            sorted_nodes.append(node)
 
         for index, node in enumerate(sorted_nodes):
             node.id = index
@@ -304,7 +285,7 @@ class Network:
         tie_node: Node = Node(-1)
         max_depth: int = -1
         for id, node in self.node_dict.items():
-            if not node.outbound_activities:
+            if node.is_end:
                 end_nodes[id] = node
                 if node.max_depth > max_depth:
                     max_depth = node.max_depth
@@ -322,16 +303,12 @@ class Network:
             else:
                 for activity in node.inbound_activities:
                     # update the inbound activities and start dependencies
-                    del self.node_dict[tie_node.start_dependencies]
                     tie_node.inbound_activities.append(activity)
-                    self.node_dict[tie_node.start_dependencies] = tie_node
 
-                    self._activity_node_lut[activity.id].end_node = tie_node
                 if node.id != 0:
                     _ = self.node_dict.pop(node.start_dependencies)
 
         self.end_node = tie_node
-        self.end_node.is_end = True
 
     def _attach_activity(self, activity: Activity, start_node: Node) -> None:
         """Attach an activity to given start node and create an end node.
@@ -346,11 +323,12 @@ class Network:
             activity(Activity): The activity to attach to the start node
             start_node(Node): The start node to which the activity is attached
         """
-        end_node = Node(next(self._node_id), max_depth=start_node.max_depth + 1)
+        end_node = self.node_dict.get_new_node()
+        end_node.max_depth = start_node.max_depth + 1
         start_node.outbound_activities.append(activity)
         end_node.inbound_activities.append(activity)
-        self._activity_node_lut[activity.id] = ActivityNodes(start_node, end_node)
-        self.node_dict[end_node.start_dependencies] = end_node
+        # self.node_dict.activity_node_lut[activity.id] = ActivityNodes(start_node, end_node)
+        # self.node_dict[end_node.start_dependencies] = end_node
 
     def _create_dummy_activity(self, start_node: Node, end_node: Node) -> set[int]:
         """Add an dummy node between a start and end node.
@@ -363,18 +341,18 @@ class Network:
            set[int]: The updated id of the end node
         """
         dummy_activity = Activity(next(self._dummy_activity_id))
+        dummy_activity.predecessors = start_node.start_dependencies
         start_node.outbound_activities.append(dummy_activity)
         end_node.inbound_activities.append(dummy_activity)
 
         end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
-        dummy_activity.predecessors = start_node.start_dependencies
 
         # When building a new floating node we will create temporary node ids which already exist
-        if end_node.start_dependencies not in self.node_dict:
-            self.node_dict[end_node.start_dependencies] = end_node
+        # if end_node.start_dependencies not in self.node_dict:
+        #     self.node_dict[end_node.start_dependencies] = end_node
 
         self._dummy_activities.append(dummy_activity)
-        self._activity_node_lut[dummy_activity.id] = ActivityNodes(start_node, end_node)
+        # self.node_dict.activity_node_lut[dummy_activity.id] = ActivityNodes(start_node, end_node)
         return end_node.start_dependencies
 
     def _find_mergable_subset_for_set(self, id_set: set[int]) -> set[int] | None:
@@ -447,10 +425,14 @@ class Network:
 
         dummy_link_start_nodes = self._minimal_viable_list(mergeable_nodes + remaining_nodes)
 
+        # There are three cases what the tie node can be
+        # 1. A tie node determined earlier in the code
+        # 2. A dummy link start node (aggregate) -> a new node has to be created
+        # 3. No nodes are applicable so the remaining option is the start node
         tie_node = (
             self.node_dict[tie_node_id]
             if tie_node_id
-            else Node(next(self._node_id)) if dummy_link_start_nodes else self.start_node  # floating node
+            else self.node_dict.get_new_node() if dummy_link_start_nodes else self.node_dict.start_node  # floating node
         )
 
         for node in dummy_link_start_nodes:
@@ -511,16 +493,20 @@ class Network:
                 new_head = self._create_dummy_activity(self.node_dict[tail[0]], self.node_dict[head])
             else:
                 for activity in self.node_dict[tail[0]].inbound_activities:
-                    self._activity_node_lut[activity.id].end_node = self.node_dict[head]
+                    # self.node_dict.activity_node_lut[activity.id].end_node = self.node_dict[head]
                     self.node_dict[head].inbound_activities.append(activity)
-                new_head = head.union(tail[0])
-                self.node_dict[new_head] = self.node_dict[head]  # Update lookup with new key
+                # new_head = head.union(tail[0])
+                # self.node_dict[new_head] = self.node_dict[head]  # Update lookup with new key
                 _ = self.node_dict.pop(tail[0])
-                _ = self.node_dict.pop(head)
+                # _ = self.node_dict.pop(head)
 
             self._recursive_merge(new_head, tail[1:])
 
     def _have_common_ancestor(self, node_left: Node, node_right: Node) -> bool:
-        ids_left = {self._activity_node_lut[activity.id].start_node.id for activity in node_left.inbound_activities}
-        ids_right = {self._activity_node_lut[activity.id].start_node.id for activity in node_right.inbound_activities}
+        ids_left = {
+            self.node_dict.activity_node_lut[activity.id].start_node.id for activity in node_left.inbound_activities
+        }
+        ids_right = {
+            self.node_dict.activity_node_lut[activity.id].start_node.id for activity in node_right.inbound_activities
+        }
         return True if ids_left.intersection(ids_right) else False

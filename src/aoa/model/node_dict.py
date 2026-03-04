@@ -1,7 +1,17 @@
-from collections.abc import Iterable, Iterator, MutableMapping, Set
-from typing import override
+from collections.abc import Generator, Iterable, Iterator, MutableMapping, Set
+from dataclasses import dataclass
+from typing import Callable, override
 
+from aoa.model.activity import Activity
+
+from .id_generator import id_generator
 from .node import Node
+
+
+@dataclass
+class ActivityNodes:
+    start_node: Node
+    end_node: Node
 
 
 class NodeDict(MutableMapping[Set[int], Node]):
@@ -11,12 +21,20 @@ class NodeDict(MutableMapping[Set[int], Node]):
     - Iteration yields frozenset[int] keys.
     """
 
-    __slots__ = ("_store",)  # pyright: ignore [reportUnannotatedClassAttribute]
+    __slots__ = (  # pyright: ignore [reportUnannotatedClassAttribute]
+        "_store",
+        "_node_id2key",
+        "_node_id_generator",
+        "activity_node_lut",
+    )
 
     def __init__(
         self,
         items: Iterable[tuple[Set[int], Node]] | None = None,
     ) -> None:
+        self._node_id_generator: Generator[int, None, None] = id_generator(start=-1, increment=1)
+        self._node_id2key: dict[int, frozenset[int]] = {}  # Maps node IDs to Node instances for quick lookup
+        self.activity_node_lut: dict[int, ActivityNodes] = {}  # Maps activity IDs to Nodes for quick lookup
         self._store: dict[frozenset[int], Node] = {}
         if items is not None:
             for k, v in items:
@@ -72,3 +90,60 @@ class NodeDict(MutableMapping[Set[int], Node]):
         # Build a dict-like repr but keys are frozenset[int]
         items = ", ".join(f"{k}: {v!r}" for k, v in self._store.items())
         return f"{self.__class__.__name__}({{{items}}})"
+
+    @override
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    @property
+    def start_node(self) -> Node:
+        """Get the start node (the node with an empty set of dependencies)."""
+        if set() not in self:
+            _ = self.get_new_node()  # Ensure the start node exists
+        return self[set()]
+
+    def get_new_node(self) -> Node:
+        """Create a new Node with a unique ID from the generator."""
+        node = Node(id=next(self._node_id_generator))
+        node.register_inbound_activity_callback(self.update_on_inbound_change_closure(node))
+        node.register_outbound_activity_callback(self.update_on_outbound_change_closure(node))
+        if node.id == 0:
+            self.__setitem__(set(), node)  # Add the initial node with an empty set key
+
+        return node
+
+    def update_on_inbound_change_closure(self, node: Node) -> Callable[[Activity], None]:
+        def update_on_inbound_change(activity: Activity) -> None:
+            # print(f"inbound change received signal for node ID {node.id}")
+            new_key = frozenset(node.start_dependencies)
+            # when creating floating nodes we can create temporary keys that have the same set of dependencies as an
+            # existing node, but we only want to update the dict when the key is unique
+            if new_key not in self:
+                if node.id in self._node_id2key:
+                    old_key = self._node_id2key[node.id]
+                    del self[old_key]  # Remove the old entry
+                self._node_id2key[node.id] = new_key  # Update the mapping from
+                self[new_key] = node  # Add the new entry
+            if activity.id in self.activity_node_lut:
+                activity_nodes = self.activity_node_lut[activity.id]
+                activity_nodes.end_node = node
+            else:
+                activity_nodes = ActivityNodes(start_node=node, end_node=node)
+            self.activity_node_lut[activity.id] = activity_nodes  # Update the LUT
+
+        return update_on_inbound_change
+
+    def update_on_outbound_change_closure(self, node: Node) -> Callable[[Activity], None]:
+        def update_on_outbound_change(activity: Activity) -> None:
+            """"""
+
+            if activity.id in self.activity_node_lut:
+                activity_nodes = self.activity_node_lut[activity.id]
+                activity_nodes.start_node = node
+            else:
+                activity_nodes = ActivityNodes(start_node=node, end_node=node)
+            activity_nodes.start_node = node
+            self.activity_node_lut[activity.id] = activity_nodes  # Update the LUT
+            # print(f"outbound change received signal for node ID {node.id}")
+
+        return update_on_outbound_change

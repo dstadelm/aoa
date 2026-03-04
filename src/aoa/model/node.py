@@ -1,16 +1,42 @@
 from dataclasses import dataclass, field
-from typing import override
+from typing import Callable, TypeVar, override
 
 from .activity import Activity
+from .observer import Observer, Subject
+
+T = TypeVar("T")
+
+
+# observable list that notives observers when an item is added or removed, used for inbound and outbound activities of a node
+class ObservableList(list[T]):
+    def __init__(self):
+        super().__init__()
+        self.callback: Callable[[T], None] = lambda x: None  # placeholder, will be set by Node when creating the list
+
+    @override
+    def append(self, item: T):
+        super().append(item)
+        self.callback(item)
+
+    @override
+    def remove(self, item: T):
+        super().remove(item)
+        self.callback(item)
+
+    def register_callback(self, callback: Callable[[T], None]) -> None:
+        self.callback = callback
 
 
 @dataclass
 class Node:
     id: int
-    is_end: bool = field(default=False, compare=False)
-    inbound_activities: list[Activity] = field(default_factory=list, repr=False, compare=False)
-    outbound_activities: list[Activity] = field(default_factory=list, repr=False, compare=False)
+    inbound_activities: ObservableList[Activity] = field(default_factory=ObservableList, repr=False, compare=False)
+    outbound_activities: ObservableList[Activity] = field(default_factory=ObservableList, repr=False, compare=False)
     max_depth: int = field(default=0, compare=False)
+
+    @property
+    def is_end(self) -> bool:
+        return len(self.outbound_activities) == 0
 
     @property
     def start_dependencies(self) -> set[int]:
@@ -47,5 +73,14 @@ class Node:
         else:
             return "-".join(str(v) for v in sorted(self.start_dependencies))
 
-    def __post_init__(self):
-        pass  # place init logging stuff here
+    def register_inbound_activity_callback(self, callback: Callable[[Activity], None]) -> None:
+        self.inbound_activities.register_callback(callback)
+
+    def register_outbound_activity_callback(self, callback: Callable[[Activity], None]) -> None:
+        self.outbound_activities.register_callback(callback)
+
+
+@dataclass
+class NodeCollection(dict[int, Node]):
+    def __init__(self, nodes: list[Node]):
+        super().__init__((node.id, node) for node in nodes)
