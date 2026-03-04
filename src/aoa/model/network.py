@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Generator
+from copy import copy, deepcopy
 from functools import cached_property
 from typing import override
 
@@ -26,29 +27,17 @@ class Network:
 
     def __init__(self, activities: ActivityCollection):
         self.node_dict: NodeDict = NodeDict()
-
-        self._dummy_activities: list[Activity] = []
-
-        self._dummy_activity_id: Generator[int, None, None] = id_generator(start=0, increment=-1)
+        self.activities: ActivityCollection = activities
 
         self.end_node: Node | None = None
 
         self._check_no_cycles_exist(activities)
         self._check_for_overconstraining(activities)
-        self._activities: list[Activity] = self._get_allocation_sequence(activities)
+        self._activities: list[Activity] = self._get_allocation_sequence(copy(activities))
         for activity in self._activities:
             self._allocate_activity(activity)
         self._tie_end_node()
         self._renumber_nodes()
-
-    @property
-    def activities(self) -> list[Activity]:
-        """Returns the list of activities in the network.
-
-        Returns:
-            list[Activity]: The list of activities in the network
-        """
-        return self._activities + self._dummy_activities
 
     def get_node_list_sorted_by_depth(self) -> list[Node]:
         """Iterate over all nodes and sort them by depth (depth of the graph from the root).
@@ -68,7 +57,7 @@ class Network:
         Returns:
             ActivityNodes: The start and end node for the given activity
         """
-        return self.node_dict.activity_node_lut[activity.id]
+        return self.node_dict.nodes_of(activity.id)
 
     def get_activity_start_node(self, activity: Activity) -> Node:
         """Returns the start node for a given activity
@@ -79,7 +68,7 @@ class Network:
         Returns:
             Node: The start node of the given activity
         """
-        return self.node_dict.activity_node_lut[activity.id].start_node
+        return self.node_dict.nodes_of(activity.id).start_node
 
     def get_activity_end_node(self, activity: Activity) -> Node:
         """Returns the start node for a given activity
@@ -90,7 +79,7 @@ class Network:
         Returns:
             Node: The start node of the given activity
         """
-        return self.node_dict.activity_node_lut[activity.id].end_node
+        return self.node_dict.nodes_of(activity.id).end_node
 
     @classmethod
     def power_subset(cls, predecessors: list[int]) -> list[set[int]]:
@@ -112,7 +101,7 @@ class Network:
     @cached_property
     def _reverse_predecessor_lut(self) -> dict[int, list[set[int]]]:
         _reverse_predecessor_lut: dict[int, list[set[int]]] = dict()
-        for activity in self._activities:
+        for activity in self.activities.values():
             for id in activity.predecessors:
                 _reverse_predecessor_lut.setdefault(id, []).append(activity.predecessors)
         return _reverse_predecessor_lut
@@ -323,7 +312,7 @@ class Network:
             activity(Activity): The activity to attach to the start node
             start_node(Node): The start node to which the activity is attached
         """
-        end_node = self.node_dict.get_new_node()
+        end_node = self.node_dict.new_node()
         end_node.max_depth = start_node.max_depth + 1
         start_node.outbound_activities.append(activity)
         end_node.inbound_activities.append(activity)
@@ -340,7 +329,7 @@ class Network:
         Returns:
            set[int]: The updated id of the end node
         """
-        dummy_activity = Activity(next(self._dummy_activity_id))
+        dummy_activity = self.activities.new_dummy_activity()
         dummy_activity.predecessors = start_node.start_dependencies
         start_node.outbound_activities.append(dummy_activity)
         end_node.inbound_activities.append(dummy_activity)
@@ -351,7 +340,6 @@ class Network:
         # if end_node.start_dependencies not in self.node_dict:
         #     self.node_dict[end_node.start_dependencies] = end_node
 
-        self._dummy_activities.append(dummy_activity)
         # self.node_dict.activity_node_lut[dummy_activity.id] = ActivityNodes(start_node, end_node)
         return end_node.start_dependencies
 
@@ -432,7 +420,7 @@ class Network:
         tie_node = (
             self.node_dict[tie_node_id]
             if tie_node_id
-            else self.node_dict.get_new_node() if dummy_link_start_nodes else self.node_dict.start_node  # floating node
+            else self.node_dict.new_node() if dummy_link_start_nodes else self.node_dict.start_node  # floating node
         )
 
         for node in dummy_link_start_nodes:
@@ -503,10 +491,6 @@ class Network:
             self._recursive_merge(new_head, tail[1:])
 
     def _have_common_ancestor(self, node_left: Node, node_right: Node) -> bool:
-        ids_left = {
-            self.node_dict.activity_node_lut[activity.id].start_node.id for activity in node_left.inbound_activities
-        }
-        ids_right = {
-            self.node_dict.activity_node_lut[activity.id].start_node.id for activity in node_right.inbound_activities
-        }
+        ids_left = {self.node_dict.nodes_of(activity.id).start_node.id for activity in node_left.inbound_activities}
+        ids_right = {self.node_dict.nodes_of(activity.id).start_node.id for activity in node_right.inbound_activities}
         return True if ids_left.intersection(ids_right) else False

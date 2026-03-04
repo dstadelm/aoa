@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from typing import override
+from typing import Generator, override
 
 from attr import define, field
 
 from .exception import NonUniqueIdException
+from .id_generator import id_generator
 from .state import State
 
 
@@ -69,7 +70,14 @@ class Activity:
 class ActivityCollection(dict[int, Activity]):
     def __init__(self, activities: list[Activity]):
         check_for_unique_ids(activities)
+        self._dummy_activity_id_generator: Generator[int, None, None] = id_generator(start=0, increment=-1)
+        self._dummy_activities: list[Activity] = []
         super().__init__((activity.id, activity) for activity in activities)
+
+    def new_dummy_activity(self) -> Activity:
+        da = Activity(next(self._dummy_activity_id_generator))
+        self._dummy_activities.append(da)
+        return da
 
 
 def check_for_unique_ids(activities: list[Activity]) -> None:

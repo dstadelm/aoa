@@ -21,8 +21,8 @@ def test_earliest_start_calculation() -> None:
     network = Network(ActivityCollection(activities))
     _calculate_earliest_start(network)
     annotated_activities = network.activities
-    assert annotated_activities[0].earliest_start == 0
-    assert annotated_activities[1].earliest_start == activities[0].effort
+    assert annotated_activities[1].earliest_start == 0
+    assert annotated_activities[2].earliest_start == activities[0].effort
 
 
 def test_latest_finish_calculation() -> None:
@@ -80,16 +80,13 @@ def test_total_float() -> None:
             predecessors={2},
         ),
     ]
-
-    network = Network(ActivityCollection(activities))
+    collection = ActivityCollection(activities)
+    network = Network(collection)
     _calculate_latest_finish(network)
-    activity_id_lut: dict[int, Activity] = {}
-    for activity in network._activities:
-        activity_id_lut[activity.id] = activity
 
-    assert activity_id_lut[2].total_float == 7
-    assert activity_id_lut[3].total_float == 7
-    assert activity_id_lut[1].total_float == 0
+    assert collection[2].total_float == 7
+    assert collection[3].total_float == 7
+    assert collection[1].total_float == 0
 
 
 def test_free_float() -> None:
@@ -109,12 +106,10 @@ def test_free_float() -> None:
         ),
     ]
 
-    network = Network(ActivityCollection(activities))
+    collection = ActivityCollection(activities)
+    network = Network(collection)
     _calculate_free_float(network)
-    activity_id_lut: dict[int, Activity] = {}
-    for activity in network._activities:
-        activity_id_lut[activity.id] = activity
 
-    assert activity_id_lut[2].free_float == 0
-    assert activity_id_lut[3].free_float == 7
-    assert activity_id_lut[1].free_float == 0
+    assert collection[2].free_float == 0
+    assert collection[3].free_float == 7
+    assert collection[1].free_float == 0

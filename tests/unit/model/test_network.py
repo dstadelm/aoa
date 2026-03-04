@@ -92,9 +92,6 @@ def test_three_parallel_activities():
     assert nodes[3].inbound_activities[1].id == -1
     assert nodes[3].inbound_activities[2].id == -2
 
-
-def test_complex_network():
-    """Test a complex network with multiple dependencies."""
     activities = [
         Activity(id=1),
         Activity(id=2),

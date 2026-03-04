@@ -52,7 +52,7 @@ def _calculate_latest_finish(network: Network) -> None:
 
 def _calculate_free_float(network: Network) -> None:
     _calculate_latest_finish(network)
-    for activity in network.activities:
+    for activity in network.activities.values():
         end_node = network.get_activity_end_node(activity)
         end_node_earliest_start: float = end_node.earliest_start
         activity.free_float = end_node_earliest_start - activity.earliest_finish

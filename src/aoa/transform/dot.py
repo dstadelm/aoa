@@ -26,6 +26,7 @@ def create_dot(graph: nx.DiGraph, coloring_strategy: ColoringStrategyProtocol) -
 def rank_dot_nodes(graph: nx.DiGraph, gvz: pgvz.AGraph) -> pgvz.AGraph:
     rank_dict: dict[int, list[int]] = dict()
     for node_name in graph.nodes:
+        print(f"Processing node {node_name} for ranking...")
         node: Node = graph.nodes[node_name]["data"]
         rank_dict.setdefault(node.max_depth, []).append(node_name)
 
