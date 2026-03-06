@@ -10,7 +10,7 @@ def to_networkx(network: Network) -> nx.DiGraph:
     for node in network.get_node_list_sorted_by_depth():
         print(f"Adding node {node.id} to NetworkX graph...")
         G.add_node(node.id, data=node)
-    for activity in network.activities:
+    for activity in network.activities.values():
         start_node = network.get_activity_start_node(activity)
         end_node = network.get_activity_end_node(activity)
         print(f"Adding edge from node {start_node.id} to node {end_node.id} for activity {activity.activity}...")

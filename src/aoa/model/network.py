@@ -2,16 +2,14 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Generator
-from copy import copy, deepcopy
-from functools import cached_property
+from copy import copy
+from functools import reduce
 from typing import override
 
 from more_itertools import powerset
 
 from .activity import Activity, ActivityCollection
 from .exception import AllocationException
-from .id_generator import id_generator
 from .node import Node
 from .node_dict import ActivityNodes, NodeDict
 
@@ -31,8 +29,6 @@ class Network:
 
         self.end_node: Node | None = None
 
-        self._check_no_cycles_exist(activities)
-        self._check_for_overconstraining(activities)
         self._activities: list[Activity] = self._get_allocation_sequence(copy(activities))
         for activity in self._activities:
             self._allocate_activity(activity)
@@ -98,14 +94,6 @@ class Network:
         powersets = [set(x) for x in list(powerset(predecessors))]
         return sorted(powersets, key=lambda x: len(x), reverse=True)
 
-    @cached_property
-    def _reverse_predecessor_lut(self) -> dict[int, list[set[int]]]:
-        _reverse_predecessor_lut: dict[int, list[set[int]]] = dict()
-        for activity in self.activities.values():
-            for id in activity.predecessors:
-                _reverse_predecessor_lut.setdefault(id, []).append(activity.predecessors)
-        return _reverse_predecessor_lut
-
     def _get_sets_that_contain_ids_in_id_set(self, id_set: set[int]) -> list[set[int]]:
         """For a given set of ids returns all sets that contain any one of those ids.
 
@@ -125,7 +113,7 @@ class Network:
             So for Activity 2 the sets in which it exists are {1, 2, 3} and {1, 2}
         """
 
-        return [subset for id in id_set for subset in self._reverse_predecessor_lut[id]]
+        return [subset for id in id_set for subset in self.activities.reverse_predecessor_lut[id]]
 
     def _get_allocation_sequence(self, activities: ActivityCollection) -> list[Activity]:
         allocated_activities: OrderedDict[int, Activity] = OrderedDict()
@@ -160,84 +148,6 @@ class Network:
 
         return get_allocation_sequence_recursion(activities)
 
-    def _check_for_overconstraining(self, activities: ActivityCollection) -> None:
-        """Check that no overconstraining exists in the provided activities.
-
-        Overconstraining exists when an activity is a direct predecessor of another activity but also a downstream predecessor of the same activity.
-
-        Arguments:
-            activities (list[Activity]): The list of activities to check
-        """
-        downstream_predecessor_lut: dict[int, set[int]] = dict()
-
-        for activity in activities.values():
-            # update downstream predecessors
-            for predecessor_id in activity.predecessors:
-
-                downstream_predecessor_lut.setdefault(predecessor_id, set()).update(
-                    activities[predecessor_id].predecessors
-                )
-                downstream_predecessor_lut.setdefault(predecessor_id, set()).update(
-                    downstream_predecessor_lut.get(predecessor_id, set())
-                )
-            intersection = downstream_predecessor_lut.get(activity.id, set()).intersection(activity.predecessors)
-            if intersection:
-                raise AllocationException(
-                    f"Downstream activcities {intersection} detected as direct predecessors of activity {activity.id}"
-                )
-
-    def _check_no_cycles_exist(self, activities: ActivityCollection) -> None:
-        """Check that no cycles exist in the provided activities.
-
-        A cycle exists when an activity is both a predecessor and a downstream predecessor of another activity.
-
-        Arguments:
-            activities (list[Activity]): The list of activities to check
-        """
-        for activity in activities.values():
-            visited: set[int] = set()
-
-            def visit(act: Activity) -> None:
-                if act.id in visited:
-                    pruned = self._prune_involved(visited, activities)
-                    message = ", ".join([f"ID[{id}]" for id in pruned])
-                    raise AllocationException(f"Cycle detected in the network involving activities {message}")
-                visited.add(act.id)
-                for pred_id in act.predecessors:
-                    visit(activities[pred_id])
-
-            visit(activity)
-
-    def _prune_involved(self, involved: set[int], activities: ActivityCollection) -> set[int]:
-        """Prune the involved set by removing activities that have no predecessors recursively.
-
-        Given activities A, B, C, D and E where A has no predecessors, B has A as predecessor C has B and E as
-        predecessor, D has C as predecessor and E has D as predecessor. The involved set is {A, B, C, D, E}. Pruning
-        this set will remove A first as it has no predecessors resulting in the set {B, C, D, E}. B will then be
-        modified to by removing A as predecessor resulting in B having no predecessors. Pruning will then remove B
-        resulting in the set {C, D, E}. B will be removed from C but C will still have E as predecessor so it won't be
-        removed. The final pruned set will be {C, D, E}.
-
-        Arguments:
-            involved (set[int]): The set of involved activity ids
-            activity_dict (dict[int, Activity]): The dictionary of activities by id
-        Returns:
-            set[int]: The pruned set of involved activity ids
-
-        """
-        pruned = involved.copy()
-        for act_id in involved:
-            activity = activities[act_id]
-            if not activity.predecessors:
-                pruned.discard(act_id)
-                for activity in activities.values():
-                    activity.predecessors.discard(act_id)
-
-        if pruned != involved:
-            return self._prune_involved(pruned, activities)
-        else:
-            return pruned
-
     @override
     def __repr__(self) -> str:
         nodes = "Nodes key, node id:\n"
@@ -270,21 +180,13 @@ class Network:
 
         The algorithm for allocating nodes leaves end nodes as they are. This function ties them to one common end node.
         """
-        end_nodes: NodeDict = NodeDict()
-        tie_node: Node = Node(-1)
-        max_depth: int = -1
-        for id, node in self.node_dict.items():
-            if node.is_end:
-                end_nodes[id] = node
-                if node.max_depth > max_depth:
-                    max_depth = node.max_depth
-                    tie_node = node
 
-        # Remove the tie_node from the end_nodes list
-        if tie_node.start_dependencies:
-            del end_nodes[tie_node.start_dependencies]
+        tie_node = reduce(
+            lambda a, b: a if a.max_depth > b.max_depth else b,
+            self.node_dict.end_nodes,
+        )
 
-        for id, node in end_nodes.items():
+        for node in self.node_dict.end_nodes:
             if node.id == tie_node.id:
                 continue
             if self._have_common_ancestor(node, tie_node):

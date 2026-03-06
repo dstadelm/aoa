@@ -1,9 +1,7 @@
-import pytest
-
 from aoa.model.activity import Activity, ActivityCollection
-from aoa.model.exception import AllocationException, NonUniqueIdException
 from aoa.model.network import Network
 from aoa.model.node import Node
+from aoa.model.node_dict import NodeDict
 
 
 def test_one_activity():
@@ -49,21 +47,28 @@ def test_two_parallel_activities():
     ]
 
     network = Network(ActivityCollection(activities))
-    nodes: list[Node] = network.get_node_list_sorted_by_depth()
-    assert len(nodes) == 3  # start and end nodes
-    assert nodes[0].outbound_activities == [activities[0], activities[1]]
 
-    activity_node_1_id = [activity.id for activity in nodes[1].inbound_activities if activity.id > 0][0]
-    activity_node_2_id = [activity.id for activity in nodes[2].inbound_activities if activity.id > 0][0]
-    assert activity_node_1_id == 3 - activity_node_2_id
+    # either the node is a start node, then  it should have two activities as outbound activities
+    # or it is the end node and has one activity as inbound activity and one dummy activity as inbound activities
+    # or it has one activity as inbound activity and no outbound activities
+    assert network.node_dict.start_node
+    inbound_activity_lengths = [len(node.inbound_activities) for node in network.node_dict.values()]
+    assert 0 in inbound_activity_lengths
+    assert 1 in inbound_activity_lengths
+    assert 2 in inbound_activity_lengths
 
-    if nodes[1].outbound_activities:
-        node_2_inbound_dummy_ids = [activity.id for activity in nodes[2].inbound_activities if activity.id < 0]
-        assert nodes[1].outbound_activities[0].id in node_2_inbound_dummy_ids
-
-    if nodes[2].outbound_activities:
-        node_1_inbound_dummy_ids = [activity.id for activity in nodes[1].inbound_activities if activity.id < 0]
-        assert nodes[2].outbound_activities[0].id in node_1_inbound_dummy_ids
+    for node in network.node_dict.values():
+        if not node.inbound_activities:
+            assert node.outbound_activities == activities
+        elif len(node.inbound_activities) == 1:
+            assert node.inbound_activities[0] in activities
+            assert len(node.outbound_activities) == 1
+            assert node.outbound_activities[0].id < 0
+        else:
+            assert len(node.inbound_activities) == 2
+            assert len([activity for activity in node.inbound_activities if activity.id < 0]) == 1
+            assert len([activity for activity in node.inbound_activities if activity.id > 0]) == 1
+            assert not node.outbound_activities
 
 
 def test_three_parallel_activities():
@@ -81,17 +86,32 @@ def test_three_parallel_activities():
     ]
 
     network = Network(ActivityCollection(activities))
-    nodes: list[Node] = network.get_node_list_sorted_by_depth()
-    assert len(nodes) == 4  # start and end nodes
-    assert nodes[0].outbound_activities == [activities[0], activities[1], activities[2]]
-    assert nodes[1].inbound_activities[0].id == 2
-    assert nodes[1].outbound_activities[0].id == -1
-    assert nodes[2].inbound_activities[0].id == 3
-    assert nodes[2].outbound_activities[0].id == -2
-    assert nodes[3].inbound_activities[0].id == 1
-    assert nodes[3].inbound_activities[1].id == -1
-    assert nodes[3].inbound_activities[2].id == -2
+    # either the node is a start node, then  it should have all three activities as outbount activities
+    # or it is the end node and has one activity as inbound activity and two dummy activities as inbound activities
+    # or it has one activity as inbound activity and one dummy activity as outbound activity
+    assert network.node_dict.start_node
+    inbound_activity_lengths = [len(node.inbound_activities) for node in network.node_dict.values()]
+    assert len(inbound_activity_lengths) == 4
+    assert 0 in inbound_activity_lengths
+    assert inbound_activity_lengths.count(1) == 2
+    assert 3 in inbound_activity_lengths
 
+    for node in network.node_dict.values():
+        if not node.inbound_activities:
+            assert node.outbound_activities == activities
+        elif len(node.inbound_activities) == 1:
+            assert node.inbound_activities[0] in activities
+            assert len(node.outbound_activities) == 1
+            assert node.outbound_activities[0].id < 0
+        else:
+            assert len(node.inbound_activities) == 3
+            assert len([activity for activity in node.inbound_activities if activity.id < 0]) == 2
+            assert len([activity for activity in node.inbound_activities if activity.id > 0]) == 1
+            assert not node.outbound_activities
+
+
+def test_complex_network():
+    """Test a complex network with multiple dependencies."""
     activities = [
         Activity(id=1),
         Activity(id=2),
@@ -107,11 +127,17 @@ def test_three_parallel_activities():
     ]
 
     network = Network(ActivityCollection(activities))
-    nodes: list[Node] = network.get_node_list_sorted_by_depth()
+    nodes: NodeDict = network.node_dict
     assert len(nodes) == 11
-    assert nodes[0].outbound_activities == [activities[0], activities[1], activities[2], activities[3], activities[4]]
+    assert nodes[set()].outbound_activities == [
+        activities[0],
+        activities[1],
+        activities[2],
+        activities[3],
+        activities[4],
+    ]
 
-    node_start_dependencies = [str(node) for node in nodes]
+    node_start_dependencies = [str(node) for node in nodes.values()]
     assert "start" in node_start_dependencies
     assert "2" in node_start_dependencies
     assert "3" in node_start_dependencies
@@ -167,49 +193,3 @@ def test_multiple_end_nodes() -> None:
     assert "2" in node_start_dependencies
     assert "3" in node_start_dependencies
     assert "1-4-5" in node_start_dependencies
-
-
-def test_overconstraining() -> None:
-
-    activities = [
-        Activity(
-            id=1,
-            effort=10,
-        ),
-        Activity(
-            id=2,
-            effort=1,
-        ),
-        Activity(
-            id=3,
-            effort=1,
-            predecessors={2},
-        ),
-        Activity(
-            id=4,
-            effort=1,
-            predecessors={3},
-        ),
-        Activity(
-            id=5,
-            effort=1,
-            predecessors={2, 3},
-        ),
-    ]
-
-    with pytest.raises(AllocationException):
-        _ = Network(ActivityCollection(activities))
-
-
-def test_validate_cycle_detection() -> None:
-    activities = [
-        Activity(id=0),
-        Activity(id=1, predecessors={0, 3}),
-        Activity(id=2, predecessors={1}),
-        Activity(id=3, predecessors={2}),
-    ]
-
-    with pytest.raises(
-        AllocationException, match=r"Cycle detected in the network involving activities ID\[1], ID\[2], ID\[3]"
-    ):
-        _ = Network(ActivityCollection(activities))

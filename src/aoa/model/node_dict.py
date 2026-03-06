@@ -26,6 +26,7 @@ class NodeDict(MutableMapping[Set[int], Node]):
         "_node_id2key",
         "_node_id_generator",
         "_activity_node_lut",
+        "_end_nodes",
     )
 
     def __init__(
@@ -36,6 +37,7 @@ class NodeDict(MutableMapping[Set[int], Node]):
         self._node_id2key: dict[int, frozenset[int]] = {}  # Maps node IDs to Node instances for quick lookup
         self._activity_node_lut: dict[int, ActivityNodes] = {}  # Maps activity IDs to Nodes for quick lookup
         self._store: dict[frozenset[int], Node] = {}
+        self._end_nodes: list[int] = []
         if items is not None:
             for k, v in items:
                 self[k] = v  # go through __setitem__ to validate and normalize
@@ -107,6 +109,7 @@ class NodeDict(MutableMapping[Set[int], Node]):
         node = Node(id=next(self._node_id_generator))
         node.register_inbound_activity_callback(self.update_on_inbound_change_closure(node))
         node.register_outbound_activity_callback(self.update_on_outbound_change_closure(node))
+        self._end_nodes.append(node.id)
         if node.id == 0:
             self.__setitem__(set(), node)  # Add the initial node with an empty set key
 
@@ -147,6 +150,12 @@ class NodeDict(MutableMapping[Set[int], Node]):
                 activity_nodes = ActivityNodes(start_node=node, end_node=node)
             activity_nodes.start_node = node
             self._activity_node_lut[activity.id] = activity_nodes  # Update the LUT
+            if node.id in self._end_nodes:
+                self._end_nodes.remove(node.id)
             # print(f"outbound change received signal for node ID {node.id}")
 
         return update_on_outbound_change
+
+    @property
+    def end_nodes(self) -> list[Node]:
+        return [self[self._node_id2key[i]] for i in self._end_nodes]
