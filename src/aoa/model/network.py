@@ -27,8 +27,6 @@ class Network:
         self.node_dict: NodeDict = NodeDict()
         self.activities: ActivityCollection = activities
 
-        self.end_node: Node | None = None
-
         self._activities: list[Activity] = self._get_allocation_sequence(copy(activities))
         for activity in self._activities:
             self._allocate_activity(activity)
@@ -55,7 +53,7 @@ class Network:
         """
         return self.node_dict.nodes_of(activity.id)
 
-    def get_activity_start_node(self, activity: Activity) -> Node:
+    def get_activity_start_node(self, activity: Activity) -> Node | None:
         """Returns the start node for a given activity
 
         Arguments:
@@ -66,7 +64,7 @@ class Network:
         """
         return self.node_dict.nodes_of(activity.id).start_node
 
-    def get_activity_end_node(self, activity: Activity) -> Node:
+    def get_activity_end_node(self, activity: Activity) -> Node | None:
         """Returns the start node for a given activity
 
         Arguments:
@@ -165,7 +163,7 @@ class Network:
         the numbering is in order but there might be blanks. This method renumbers all nodes in sequential manner
         without changing their order.
         """
-        if not self.end_node:
+        if not len(self.node_dict.end_nodes) == 1:
             raise Exception("Undefined end_node")
 
         sorted_nodes: list[Node] = []
@@ -196,10 +194,8 @@ class Network:
                     # update the inbound activities and start dependencies
                     tie_node.inbound_activities.append(activity)
 
-                if node.id != 0:
-                    _ = self.node_dict.pop(node.start_dependencies)
-
-        self.end_node = tie_node
+                # if node.id != 0:
+                #     _ = self.node_dict.pop(node.start_dependencies)
 
     def _attach_activity(self, activity: Activity, start_node: Node) -> None:
         """Attach an activity to given start node and create an end node.
@@ -393,6 +389,14 @@ class Network:
             self._recursive_merge(new_head, tail[1:])
 
     def _have_common_ancestor(self, node_left: Node, node_right: Node) -> bool:
-        ids_left = {self.node_dict.nodes_of(activity.id).start_node.id for activity in node_left.inbound_activities}
-        ids_right = {self.node_dict.nodes_of(activity.id).start_node.id for activity in node_right.inbound_activities}
+        ids_left = {
+            self.node_dict.nodes_of(activity.id).start_node.id  # pyright: ignore [reportOptionalMemberAccess]
+            for activity in node_left.inbound_activities
+            if self.node_dict.nodes_of(activity.id).start_node
+        }
+        ids_right = {
+            self.node_dict.nodes_of(activity.id).start_node.id  # pyright: ignore [reportOptionalMemberAccess]
+            for activity in node_right.inbound_activities
+            if self.node_dict.nodes_of(activity.id).start_node
+        }
         return True if ids_left.intersection(ids_right) else False

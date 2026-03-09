@@ -10,8 +10,8 @@ from .node import Node
 
 @dataclass
 class ActivityNodes:
-    start_node: Node
-    end_node: Node
+    start_node: Node | None
+    end_node: Node | None
 
 
 class NodeDict(MutableMapping[Set[int], Node]):
@@ -107,8 +107,12 @@ class NodeDict(MutableMapping[Set[int], Node]):
     def new_node(self) -> Node:
         """Create a new Node with a unique ID from the generator."""
         node = Node(id=next(self._node_id_generator))
-        node.register_inbound_activity_callback(self.update_on_inbound_change_closure(node))
-        node.register_outbound_activity_callback(self.update_on_outbound_change_closure(node))
+
+        node.register_inbound_activity_append_callback(self.update_on_inbound_append_change_closure(node))
+        node.register_inbound_activity_remove_callback(self.update_on_inbound_remove_change_closure(node))
+        node.register_outbound_activity_append_callback(self.update_on_outbound_append_change_closure(node))
+        node.register_outbound_activity_remove_callback(self.update_on_outbound_remove_change_closure(node))
+
         self._end_nodes.append(node.id)
         if node.id == 0:
             self.__setitem__(set(), node)  # Add the initial node with an empty set key
@@ -118,8 +122,8 @@ class NodeDict(MutableMapping[Set[int], Node]):
     def nodes_of(self, activity_id: int) -> ActivityNodes:
         return self._activity_node_lut[activity_id]
 
-    def update_on_inbound_change_closure(self, node: Node) -> Callable[[Activity], None]:
-        def update_on_inbound_change(activity: Activity) -> None:
+    def update_on_inbound_append_change_closure(self, node: Node) -> Callable[[Activity], None]:
+        def update_on_inbound_append_change(activity: Activity) -> None:
             # print(f"inbound change received signal for node ID {node.id}")
             new_key = frozenset(node.start_dependencies)
             # when creating floating nodes we can create temporary keys that have the same set of dependencies as an
@@ -132,29 +136,68 @@ class NodeDict(MutableMapping[Set[int], Node]):
                 self[new_key] = node  # Add the new entry
             if activity.id in self._activity_node_lut:
                 activity_nodes = self._activity_node_lut[activity.id]
+                if activity_nodes.end_node:
+                    activity_nodes.end_node.inbound_activities.remove(activity)  # Remove the activity from the old end
                 activity_nodes.end_node = node
             else:
-                activity_nodes = ActivityNodes(start_node=node, end_node=node)
+                activity_nodes = ActivityNodes(start_node=None, end_node=node)
             self._activity_node_lut[activity.id] = activity_nodes  # Update the LUT
 
-        return update_on_inbound_change
+        return update_on_inbound_append_change
 
-    def update_on_outbound_change_closure(self, node: Node) -> Callable[[Activity], None]:
-        def update_on_outbound_change(activity: Activity) -> None:
+    def update_on_inbound_remove_change_closure(self, node: Node) -> Callable[[Activity], None]:
+        def update_on_inbound_remove(activity: Activity) -> None:
+            # update the dict entry
+            new_key = frozenset(node.start_dependencies)
+            if node.id in self._node_id2key:
+                old_key = self._node_id2key[node.id]
+                del self[old_key]  # Remove the old entry
+            if new_key == frozenset({}):
+                del self._node_id2key[node.id]
+                if node.id in self._end_nodes:
+                    self._end_nodes.remove(node.id)
+            else:
+                self._node_id2key[node.id] = new_key  # Update the mapping from
+                self[new_key] = node  # Add the new entry
+            # remove the end node from the activity
+            if activity.id in self._activity_node_lut:
+                activity_nodes = self._activity_node_lut[activity.id]
+                if activity_nodes.end_node and node.id == activity_nodes.end_node.id:
+                    activity_nodes.end_node = None
+                    self._activity_node_lut[activity.id] = activity_nodes  # Update the LUT
+
+        return update_on_inbound_remove
+
+    def update_on_outbound_append_change_closure(self, node: Node) -> Callable[[Activity], None]:
+        def update_on_outbound_append_change(activity: Activity) -> None:
             """"""
 
             if activity.id in self._activity_node_lut:
                 activity_nodes = self._activity_node_lut[activity.id]
                 activity_nodes.start_node = node
             else:
-                activity_nodes = ActivityNodes(start_node=node, end_node=node)
+                activity_nodes = ActivityNodes(start_node=node, end_node=None)
             activity_nodes.start_node = node
             self._activity_node_lut[activity.id] = activity_nodes  # Update the LUT
             if node.id in self._end_nodes:
                 self._end_nodes.remove(node.id)
-            # print(f"outbound change received signal for node ID {node.id}")
 
-        return update_on_outbound_change
+        return update_on_outbound_append_change
+
+    def update_on_outbound_remove_change_closure(self, node: Node) -> Callable[[Activity], None]:
+        def update_on_outbound_remove_change(activity: Activity) -> None:
+            # remove the start node
+            if activity.id in self._activity_node_lut:
+                activity_nodes = self._activity_node_lut[activity.id]
+                if activity_nodes.start_node and activity_nodes.start_node.id == node.id:
+                    activity_nodes.start_node = None
+                self._activity_node_lut[activity.id] = activity_nodes  # Update the LUT
+            # if there are no outbound activities left on the node add it to the end nodes list
+            if node.id in self._end_nodes:
+                if not node.outbound_activities:
+                    self._end_nodes.append(node.id)
+
+        return update_on_outbound_remove_change
 
     @property
     def end_nodes(self) -> list[Node]:

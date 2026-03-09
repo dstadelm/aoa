@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from typing import Callable, TypeVar, override
 
 from .activity import Activity
-from .observer import Observer, Subject
 
 T = TypeVar("T")
 
@@ -11,20 +10,28 @@ T = TypeVar("T")
 class ObservableList(list[T]):
     def __init__(self):
         super().__init__()
-        self.callback: Callable[[T], None] = lambda x: None  # placeholder, will be set by Node when creating the list
+        self.append_callback: Callable[[T], None] = (
+            lambda x: None
+        )  # placeholder, will be set by Node when creating the list
+        self.remove_callback: Callable[[T], None] = (
+            lambda x: None
+        )  # placeholder, will be set by Node when creating the list
 
     @override
     def append(self, item: T):
         super().append(item)
-        self.callback(item)
+        self.append_callback(item)
 
     @override
     def remove(self, item: T):
         super().remove(item)
-        self.callback(item)
+        self.remove_callback(item)
 
-    def register_callback(self, callback: Callable[[T], None]) -> None:
-        self.callback = callback
+    def register_append_callback(self, callback: Callable[[T], None]) -> None:
+        self.append_callback = callback
+
+    def register_remove_callback(self, callback: Callable[[T], None]) -> None:
+        self.remove_callback = callback
 
 
 @dataclass
@@ -73,11 +80,17 @@ class Node:
         else:
             return "-".join(str(v) for v in sorted(self.start_dependencies))
 
-    def register_inbound_activity_callback(self, callback: Callable[[Activity], None]) -> None:
-        self.inbound_activities.register_callback(callback)
+    def register_inbound_activity_append_callback(self, callback: Callable[[Activity], None]) -> None:
+        self.inbound_activities.register_append_callback(callback)
 
-    def register_outbound_activity_callback(self, callback: Callable[[Activity], None]) -> None:
-        self.outbound_activities.register_callback(callback)
+    def register_outbound_activity_append_callback(self, callback: Callable[[Activity], None]) -> None:
+        self.outbound_activities.register_append_callback(callback)
+
+    def register_inbound_activity_remove_callback(self, callback: Callable[[Activity], None]) -> None:
+        self.inbound_activities.register_remove_callback(callback)
+
+    def register_outbound_activity_remove_callback(self, callback: Callable[[Activity], None]) -> None:
+        self.outbound_activities.register_remove_callback(callback)
 
 
 @dataclass
