@@ -214,8 +214,6 @@ class Network:
         end_node.max_depth = start_node.max_depth + 1
         start_node.outbound_activities.append(activity)
         end_node.inbound_activities.append(activity)
-        # self.node_dict.activity_node_lut[activity.id] = ActivityNodes(start_node, end_node)
-        # self.node_dict[end_node.start_dependencies] = end_node
 
     def _create_dummy_activity(self, start_node: Node, end_node: Node) -> set[int]:
         """Add an dummy node between a start and end node.
@@ -234,11 +232,6 @@ class Network:
 
         end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
 
-        # When building a new floating node we will create temporary node ids which already exist
-        # if end_node.start_dependencies not in self.node_dict:
-        #     self.node_dict[end_node.start_dependencies] = end_node
-
-        # self.node_dict.activity_node_lut[dummy_activity.id] = ActivityNodes(start_node, end_node)
         return end_node.start_dependencies
 
     def _find_mergable_subset_for_set(self, id_set: set[int]) -> set[int] | None:
@@ -281,11 +274,7 @@ class Network:
             return None
 
     def _allocate_activity(self, activity: Activity) -> None:
-        """
-        Add the provided activity and link all dependencies to it
-
-
-        """
+        """Add the provided activity and link all dependencies to it."""
         predecessors = activity.predecessors.copy()
 
         def update_predecessors(node_id: set[int]) -> set[int]:
@@ -379,12 +368,7 @@ class Network:
                 new_head = self._create_dummy_activity(self.node_dict[tail[0]], self.node_dict[head])
             else:
                 for activity in self.node_dict[tail[0]].inbound_activities:
-                    # self.node_dict.activity_node_lut[activity.id].end_node = self.node_dict[head]
                     self.node_dict[head].inbound_activities.append(activity)
-                # new_head = head.union(tail[0])
-                # self.node_dict[new_head] = self.node_dict[head]  # Update lookup with new key
-                _ = self.node_dict.pop(tail[0])
-                # _ = self.node_dict.pop(head)
 
             self._recursive_merge(new_head, tail[1:])
 
