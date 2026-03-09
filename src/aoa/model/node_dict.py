@@ -199,6 +199,20 @@ class NodeDict(MutableMapping[Set[int], Node]):
 
         return update_on_outbound_remove_change
 
+    def have_common_ancestor(self, left_node_id: int, right_node_id: int) -> bool:
+        """Check if two nodes have a common ancestor by comparing the start nodes of their inbound activities."""
+        ids_left = {
+            self.nodes_of(activity.id).start_node.id  # pyright: ignore [reportOptionalMemberAccess]
+            for activity in self[self._node_id2key[left_node_id]].inbound_activities
+            if self.nodes_of(activity.id).start_node
+        }
+        ids_right = {
+            self.nodes_of(activity.id).start_node.id  # pyright: ignore [reportOptionalMemberAccess]
+            for activity in self[self._node_id2key[right_node_id]].inbound_activities
+            if self.nodes_of(activity.id).start_node
+        }
+        return True if ids_left.intersection(ids_right) else False
+
     @property
     def end_nodes(self) -> list[Node]:
         return [self[self._node_id2key[i]] for i in self._end_nodes]

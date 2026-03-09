@@ -187,7 +187,7 @@ class Network:
         for node in self.node_dict.end_nodes:
             if node.id == tie_node.id:
                 continue
-            if self._have_common_ancestor(node, tie_node):
+            if self.node_dict.have_common_ancestor(node.id, tie_node.id):
                 _ = self._create_dummy_activity(node, tie_node)
             else:
                 for activity in node.inbound_activities:
@@ -364,23 +364,10 @@ class Network:
     def _recursive_merge(self, head: set[int], tail: list[set[int]]) -> None:
         new_head: set[int] = set()
         if tail:
-            if self._have_common_ancestor(self.node_dict[head], self.node_dict[tail[0]]):
+            if self.node_dict.have_common_ancestor(self.node_dict[head].id, self.node_dict[tail[0]].id):
                 new_head = self._create_dummy_activity(self.node_dict[tail[0]], self.node_dict[head])
             else:
                 for activity in self.node_dict[tail[0]].inbound_activities:
                     self.node_dict[head].inbound_activities.append(activity)
 
             self._recursive_merge(new_head, tail[1:])
-
-    def _have_common_ancestor(self, node_left: Node, node_right: Node) -> bool:
-        ids_left = {
-            self.node_dict.nodes_of(activity.id).start_node.id  # pyright: ignore [reportOptionalMemberAccess]
-            for activity in node_left.inbound_activities
-            if self.node_dict.nodes_of(activity.id).start_node
-        }
-        ids_right = {
-            self.node_dict.nodes_of(activity.id).start_node.id  # pyright: ignore [reportOptionalMemberAccess]
-            for activity in node_right.inbound_activities
-            if self.node_dict.nodes_of(activity.id).start_node
-        }
-        return True if ids_left.intersection(ids_right) else False
