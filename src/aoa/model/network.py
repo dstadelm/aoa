@@ -29,9 +29,9 @@ class Network:
 
         self._activities: list[Activity] = self._get_allocation_sequence(copy(activities))
         for activity in self._activities:
-            self._allocate_activity(activity)
-        self._tie_end_node()
-        self._renumber_nodes()
+            self._allocate_activity(activity, self.node_dict, self.activities)
+        self._tie_end_node(self.activities, self.node_dict)
+        self._renumber_nodes(self.node_dict)
 
     def get_node_list_sorted_by_depth(self) -> list[Node]:
         """Iterate over all nodes and sort them by depth (depth of the graph from the root).
@@ -92,7 +92,7 @@ class Network:
         powersets = [set(x) for x in list(powerset(predecessors))]
         return sorted(powersets, key=lambda x: len(x), reverse=True)
 
-    def _get_sets_that_contain_ids_in_id_set(self, id_set: set[int]) -> list[set[int]]:
+    def _get_sets_that_contain_ids_in_id_set(self, id_set: set[int], activities: ActivityCollection) -> list[set[int]]:
         """For a given set of ids returns all sets that contain any one of those ids.
 
         Where a set is a group of activities which are together the predecessors of an activity
@@ -111,7 +111,7 @@ class Network:
             So for Activity 2 the sets in which it exists are {1, 2, 3} and {1, 2}
         """
 
-        return [subset for id in id_set for subset in self.activities.reverse_predecessor_lut[id]]
+        return [subset for id in id_set for subset in activities.reverse_predecessor_lut[id]]
 
     def _get_allocation_sequence(self, activities: ActivityCollection) -> list[Activity]:
         allocated_activities: OrderedDict[int, Activity] = OrderedDict()
@@ -156,24 +156,24 @@ class Network:
                 nodes += "\n"
         return nodes
 
-    def _renumber_nodes(self) -> None:
+    def _renumber_nodes(self, node_dict: NodeDict) -> None:
         """Renumber nodes to have a consecutive numbering for the nodes.
 
         During the generation of the nodes some nodes can be tied together resulting in nodes getting dropped, therefore
         the numbering is in order but there might be blanks. This method renumbers all nodes in sequential manner
         without changing their order.
         """
-        if not len(self.node_dict.end_nodes) == 1:
+        if not len(node_dict.end_nodes) == 1:
             raise Exception("Undefined end_node")
 
         sorted_nodes: list[Node] = []
-        for node in list(sorted(self.node_dict.values(), key=lambda x: x.max_depth)):
+        for node in list(sorted(node_dict.values(), key=lambda x: x.max_depth)):
             sorted_nodes.append(node)
 
         for index, node in enumerate(sorted_nodes):
             node.id = index
 
-    def _tie_end_node(self) -> None:
+    def _tie_end_node(self, activities: ActivityCollection, node_dict: NodeDict) -> None:
         """Ties leaf nodes to one end node.
 
         The algorithm for allocating nodes leaves end nodes as they are. This function ties them to one common end node.
@@ -181,23 +181,20 @@ class Network:
 
         tie_node = reduce(
             lambda a, b: a if a.max_depth > b.max_depth else b,
-            self.node_dict.end_nodes,
+            node_dict.end_nodes,
         )
 
-        for node in self.node_dict.end_nodes:
+        for node in node_dict.end_nodes:
             if node.id == tie_node.id:
                 continue
-            if self.node_dict.have_common_ancestor(node.id, tie_node.id):
-                _ = self._create_dummy_activity(node, tie_node)
+            if node_dict.have_common_ancestor(node.id, tie_node.id):
+                _ = self._create_dummy_activity(node, tie_node, activities)
             else:
                 for activity in node.inbound_activities:
                     # update the inbound activities and start dependencies
                     tie_node.inbound_activities.append(activity)
 
-                # if node.id != 0:
-                #     _ = self.node_dict.pop(node.start_dependencies)
-
-    def _attach_activity(self, activity: Activity, start_node: Node) -> None:
+    def _attach_activity(self, activity: Activity, start_node: Node, end_node: Node) -> None:
         """Attach an activity to given start node and create an end node.
 
         * The outbound activities of the start node are updated.
@@ -210,12 +207,10 @@ class Network:
             activity(Activity): The activity to attach to the start node
             start_node(Node): The start node to which the activity is attached
         """
-        end_node = self.node_dict.new_node()
-        end_node.max_depth = start_node.max_depth + 1
         start_node.outbound_activities.append(activity)
         end_node.inbound_activities.append(activity)
 
-    def _create_dummy_activity(self, start_node: Node, end_node: Node) -> set[int]:
+    def _create_dummy_activity(self, start_node: Node, end_node: Node, activities: ActivityCollection) -> set[int]:
         """Add an dummy node between a start and end node.
 
         Arguments:
@@ -225,16 +220,16 @@ class Network:
         Returns:
            set[int]: The updated id of the end node
         """
-        dummy_activity = self.activities.new_dummy_activity()
+        dummy_activity = activities.new_dummy_activity()
         dummy_activity.predecessors = start_node.start_dependencies
         start_node.outbound_activities.append(dummy_activity)
         end_node.inbound_activities.append(dummy_activity)
 
-        end_node.max_depth = max([start_node.max_depth + 1, end_node.max_depth])
-
         return end_node.start_dependencies
 
-    def _find_mergable_subset_for_set(self, id_set: set[int]) -> set[int] | None:
+    def _find_mergable_subset_for_set(
+        self, id_set: set[int], activities: ActivityCollection, node_dict: NodeDict
+    ) -> set[int] | None:
         """
         Search for nodes that can be merged with the provided set without violating the existing set
 
@@ -244,10 +239,12 @@ class Network:
         Returns:
             Optional[set[int]]: The mergable subset that can be merged with the given id_set
         """
-        subset = self._find_tieable_node_for_set(id_set)
+        subset = self._find_tieable_node_for_set(id_set, activities, node_dict)
         return subset if subset and len(subset) > 1 else None
 
-    def _find_tieable_node_for_set(self, predecessors: set[int]) -> set[int] | None:
+    def _find_tieable_node_for_set(
+        self, predecessors: set[int], activities: ActivityCollection, node_dict: NodeDict
+    ) -> set[int] | None:
         """
         Searches over all existing sets and removes nodes which are bound by a existing set
 
@@ -258,11 +255,11 @@ class Network:
             Optional[set[int]]: The activities that can be merged to one end node
 
         """
-        if (not predecessors) or (predecessors in self.node_dict):
+        if (not predecessors) or (predecessors in node_dict):
             return predecessors
 
         mutable_node_id = predecessors.copy()
-        for pred_set in self._get_sets_that_contain_ids_in_id_set(predecessors):
+        for pred_set in self._get_sets_that_contain_ids_in_id_set(predecessors, activities):
             if not predecessors.issubset(pred_set):
                 mutable_node_id.difference_update(pred_set)
             if not mutable_node_id:
@@ -273,7 +270,7 @@ class Network:
         else:
             return None
 
-    def _allocate_activity(self, activity: Activity) -> None:
+    def _allocate_activity(self, activity: Activity, node_dict: NodeDict, activities: ActivityCollection) -> None:
         """Add the provided activity and link all dependencies to it."""
         predecessors = activity.predecessors.copy()
 
@@ -282,21 +279,21 @@ class Network:
             return node_id
 
         # if it exists find the node to which all predecessors can be bound
-        if tie_node_id := self._find_tieable_node_for_set(predecessors.copy()):
-            self._merge_subset(tie_node_id)
+        if tie_node_id := self._find_tieable_node_for_set(predecessors.copy(), activities, node_dict):
+            self._merge_subset(tie_node_id, activities, node_dict)
             predecessors.difference_update(tie_node_id)
 
         # find subsets that can be created from existing sub-subsets
         mergeable_nodes = [
             update_predecessors(node_id)
             for subset in Network.power_subset(list(predecessors))
-            if (node_id := self._find_mergable_subset_for_set(subset))
+            if (node_id := self._find_mergable_subset_for_set(subset, activities, node_dict))
         ]
 
         for node in mergeable_nodes:
-            self._merge_subset(node)
+            self._merge_subset(node, activities, node_dict)
 
-        remaining_nodes = [subset for subset in Network.power_subset(list(predecessors)) if subset in self.node_dict]
+        remaining_nodes = [subset for subset in Network.power_subset(list(predecessors)) if subset in node_dict]
 
         dummy_link_start_nodes = self._minimal_viable_list(mergeable_nodes + remaining_nodes)
 
@@ -305,17 +302,18 @@ class Network:
         # 2. A dummy link start node (aggregate) -> a new node has to be created
         # 3. No nodes are applicable so the remaining option is the start node
         tie_node = (
-            self.node_dict[tie_node_id]
+            node_dict[tie_node_id]
             if tie_node_id
-            else self.node_dict.new_node() if dummy_link_start_nodes else self.node_dict.start_node  # floating node
+            else node_dict.new_node() if dummy_link_start_nodes else node_dict.start_node  # floating node
         )
 
         for node in dummy_link_start_nodes:
             _ = self._create_dummy_activity(
-                self.node_dict[node],
+                node_dict[node],
                 tie_node,
+                activities,
             )
-        self._attach_activity(activity, tie_node)
+        self._attach_activity(activity, tie_node, end_node=node_dict.new_node())
 
     def _minimal_viable_list(self, list_of_sets: list[set[int]]) -> list[set[int]]:
         """
@@ -339,7 +337,7 @@ class Network:
         else:
             return set()
 
-    def _merge_subset(self, merge_set: set[int]) -> None:
+    def _merge_subset(self, merge_set: set[int], activities: ActivityCollection, node_dict: NodeDict) -> None:
         """
         As subsets of the to be merged subset could potentially already have been merged the following steps are required
         1. go through each subset of the subset and check if there is a activity with that id
@@ -352,22 +350,24 @@ class Network:
         while mutable_merge_set:
             old_mutable_merge_set = mutable_merge_set.copy()
             for subset in Network.power_subset(list(mutable_merge_set)):
-                if set(subset) in self.node_dict:
+                if set(subset) in node_dict:
                     activity_ids_to_link.append(set(subset))
                     mutable_merge_set.difference_update(subset)
                     break
             if old_mutable_merge_set == mutable_merge_set:
                 raise Exception("Unable to merge subset")
         if activity_ids_to_link:
-            self._recursive_merge(activity_ids_to_link[0], activity_ids_to_link[1:])
+            self._recursive_merge(activity_ids_to_link[0], activity_ids_to_link[1:], activities, node_dict)
 
-    def _recursive_merge(self, head: set[int], tail: list[set[int]]) -> None:
+    def _recursive_merge(
+        self, head: set[int], tail: list[set[int]], activities: ActivityCollection, node_dict: NodeDict
+    ) -> None:
         new_head: set[int] = set()
         if tail:
-            if self.node_dict.have_common_ancestor(self.node_dict[head].id, self.node_dict[tail[0]].id):
-                new_head = self._create_dummy_activity(self.node_dict[tail[0]], self.node_dict[head])
+            if node_dict.have_common_ancestor(node_dict[head].id, node_dict[tail[0]].id):
+                new_head = self._create_dummy_activity(node_dict[tail[0]], node_dict[head], activities)
             else:
-                for activity in self.node_dict[tail[0]].inbound_activities:
-                    self.node_dict[head].inbound_activities.append(activity)
+                for activity in node_dict[tail[0]].inbound_activities:
+                    node_dict[head].inbound_activities.append(activity)
 
-            self._recursive_merge(new_head, tail[1:])
+            self._recursive_merge(new_head, tail[1:], activities, node_dict)

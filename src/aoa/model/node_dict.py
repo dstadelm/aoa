@@ -134,6 +134,7 @@ class NodeDict(MutableMapping[Set[int], Node]):
                     del self[old_key]  # Remove the old entry
                 self._node_id2key[node.id] = new_key  # Update the mapping from
                 self[new_key] = node  # Add the new entry
+
             if activity.id in self._activity_node_lut:
                 activity_nodes = self._activity_node_lut[activity.id]
                 if activity_nodes.end_node:
@@ -142,6 +143,13 @@ class NodeDict(MutableMapping[Set[int], Node]):
             else:
                 activity_nodes = ActivityNodes(start_node=None, end_node=node)
             self._activity_node_lut[activity.id] = activity_nodes  # Update the LUT
+
+            # update max depth of the node
+            if activity.id in self._activity_node_lut:
+                activity_nodes = self._activity_node_lut[activity.id]
+                if activity_nodes.start_node:
+                    if activity_nodes.start_node.max_depth >= node.max_depth:
+                        node.max_depth = activity_nodes.start_node.max_depth + 1
 
         return update_on_inbound_append_change
 
@@ -165,6 +173,14 @@ class NodeDict(MutableMapping[Set[int], Node]):
                 if activity_nodes.end_node and node.id == activity_nodes.end_node.id:
                     activity_nodes.end_node = None
                     self._activity_node_lut[activity.id] = activity_nodes  # Update the LUT
+
+            # update max depth of the node
+            node.max_depth = 0
+            for activity in node.inbound_activities:
+                if activity.id in self._activity_node_lut:
+                    activity_nodes = self._activity_node_lut[activity.id]
+                    if activity_nodes.start_node and activity_nodes.start_node.max_depth >= node.max_depth:
+                        node.max_depth = activity_nodes.start_node.max_depth + 1
 
         return update_on_inbound_remove
 
