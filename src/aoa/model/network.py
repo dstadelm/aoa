@@ -29,7 +29,7 @@ class Network:
 
         self._activities: list[Activity] = self._get_allocation_sequence(copy(activities))
         for activity in self._activities:
-            self._allocate_activity(activity, self.node_dict, self.activities)
+            self._allocate_activity(activity, self.activities, self.node_dict)
         self._tie_end_node(self.activities, self.node_dict)
         self._renumber_nodes(self.node_dict)
 
@@ -163,8 +163,11 @@ class Network:
         the numbering is in order but there might be blanks. This method renumbers all nodes in sequential manner
         without changing their order.
         """
-        if not len(node_dict.end_nodes) == 1:
-            raise Exception("Undefined end_node")
+        if len(node_dict.end_nodes) > 1:
+            end_node_ids = [node.id for node in node_dict.end_nodes]
+            raise Exception(f"Undefined end_node, multiple end nodes detected {end_node_ids}")
+        if len(node_dict.end_nodes) == 0:
+            raise Exception("Undefined end_node, no end node defined")
 
         sorted_nodes: list[Node] = []
         for node in list(sorted(node_dict.values(), key=lambda x: x.max_depth)):
@@ -255,6 +258,9 @@ class Network:
             Optional[set[int]]: The activities that can be merged to one end node
 
         """
+
+        # if there are no predecessors or the predecessors are already reprexented by a node then return the
+        # predecessors as they are
         if (not predecessors) or (predecessors in node_dict):
             return predecessors
 
@@ -268,7 +274,7 @@ class Network:
 
         return mutable_node_id
 
-    def _allocate_activity(self, activity: Activity, node_dict: NodeDict, activities: ActivityCollection) -> None:
+    def _allocate_activity(self, activity: Activity, activities: ActivityCollection, node_dict: NodeDict) -> None:
         """Add the provided activity and link all dependencies to it."""
         predecessors = activity.predecessors.copy()
 
