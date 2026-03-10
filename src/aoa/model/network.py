@@ -244,7 +244,7 @@ class Network:
 
     def _find_tieable_node_for_set(
         self, predecessors: set[int], activities: ActivityCollection, node_dict: NodeDict
-    ) -> set[int] | None:
+    ) -> set[int]:
         """
         Searches over all existing sets and removes nodes which are bound by a existing set
 
@@ -262,13 +262,11 @@ class Network:
         for pred_set in self._get_sets_that_contain_ids_in_id_set(predecessors, activities):
             if not predecessors.issubset(pred_set):
                 mutable_node_id.difference_update(pred_set)
+            # early exit if there are no more nodes that can be tied together
             if not mutable_node_id:
-                return None
+                return mutable_node_id
 
-        if mutable_node_id:
-            return mutable_node_id
-        else:
-            return None
+        return mutable_node_id
 
     def _allocate_activity(self, activity: Activity, node_dict: NodeDict, activities: ActivityCollection) -> None:
         """Add the provided activity and link all dependencies to it."""
