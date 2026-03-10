@@ -106,12 +106,13 @@ class NodeDict(MutableMapping[Set[int], Node]):
 
     def new_node(self) -> Node:
         """Create a new Node with a unique ID from the generator."""
-        node = Node(id=next(self._node_id_generator))
+        node = Node(_id=next(self._node_id_generator))
 
         node.register_inbound_activity_append_callback(self.update_on_inbound_append_change_closure(node))
         node.register_inbound_activity_remove_callback(self.update_on_inbound_remove_change_closure(node))
         node.register_outbound_activity_append_callback(self.update_on_outbound_append_change_closure(node))
         node.register_outbound_activity_remove_callback(self.update_on_outbound_remove_change_closure(node))
+        node.register_node_id_change_callback(self.update_on_node_id_change_closure(node))
 
         self._end_nodes.append(node.id)
         if node.id == 0:
@@ -214,6 +215,16 @@ class NodeDict(MutableMapping[Set[int], Node]):
                     self._end_nodes.append(node.id)
 
         return update_on_outbound_remove_change
+
+    def update_on_node_id_change_closure(self, node: Node) -> Callable[[int], None]:
+        def update_on_node_id_change(new_id: int) -> None:
+            # when a node's ID changes, we need to update the _node_id2key mapping and the _activity_node_lut
+            if node.id in self._node_id2key:
+                key = self._node_id2key[node.id]
+                del self._node_id2key[node.id]  # Remove the old entry
+                self._node_id2key[new_id] = key  # Add the new entry
+
+        return update_on_node_id_change
 
     def have_common_ancestor(self, left_node_id: int, right_node_id: int) -> bool:
         """Check if two nodes have a common ancestor by comparing the start nodes of their inbound activities."""

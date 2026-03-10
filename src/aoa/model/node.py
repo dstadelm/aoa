@@ -36,10 +36,19 @@ class ObservableList(list[T]):
 
 @dataclass
 class Node:
-    id: int
+    _id: int
     inbound_activities: ObservableList[Activity] = field(default_factory=ObservableList, repr=False, compare=False)
     outbound_activities: ObservableList[Activity] = field(default_factory=ObservableList, repr=False, compare=False)
     max_depth: int = field(default=0, compare=False)
+    _id_change_callback: Callable[[int], None] = field(default=lambda x: None, repr=False, compare=False)
+
+    @property
+    def id(self) -> int:
+        return self._id
+
+    @id.setter
+    def id(self, value: int) -> None:
+        self._id = value
 
     @property
     def is_end(self) -> bool:
@@ -91,6 +100,9 @@ class Node:
 
     def register_outbound_activity_remove_callback(self, callback: Callable[[Activity], None]) -> None:
         self.outbound_activities.register_remove_callback(callback)
+
+    def register_node_id_change_callback(self, callback: Callable[[int], None]) -> None:
+        self._id_change_callback = callback
 
 
 @dataclass
