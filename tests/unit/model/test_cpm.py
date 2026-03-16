@@ -2,7 +2,7 @@ from aoa.model.activity import Activity, ActivityCollection
 from aoa.model.cpm import _calculate_earliest_start  # pyright: ignore [reportPrivateUsage]
 from aoa.model.cpm import _calculate_free_float  # pyright: ignore [reportPrivateUsage]
 from aoa.model.cpm import _calculate_latest_finish  # pyright: ignore [reportPrivateUsage]
-from aoa.model.network import Network
+from aoa.model.network import Network, create_network
 
 
 def test_earliest_start_calculation() -> None:
@@ -18,7 +18,7 @@ def test_earliest_start_calculation() -> None:
         ),
     ]
 
-    network = Network(ActivityCollection(activities))
+    network = create_network(ActivityCollection(activities))
     _calculate_earliest_start(network)
     annotated_activities = network.activities
     assert annotated_activities[1].earliest_start == 0
@@ -52,16 +52,13 @@ def test_latest_finish_calculation() -> None:
         ),
     ]
 
-    network = Network(ActivityCollection(activities))
+    network = create_network(ActivityCollection(activities))
     _calculate_latest_finish(network)
-    activity_id_lut: dict[int, Activity] = {}
-    for activity in network._activities:
-        activity_id_lut[activity.id] = activity
-    assert activity_id_lut[1].latest_finish == 10
-    assert activity_id_lut[2].latest_finish == 6
-    assert activity_id_lut[3].latest_finish == 8
-    assert activity_id_lut[4].latest_finish == 10
-    assert activity_id_lut[5].latest_finish == 10
+    assert network.activities[1].latest_finish == 10
+    assert network.activities[2].latest_finish == 6
+    assert network.activities[3].latest_finish == 8
+    assert network.activities[4].latest_finish == 10
+    assert network.activities[5].latest_finish == 10
 
 
 def test_total_float() -> None:
@@ -81,7 +78,7 @@ def test_total_float() -> None:
         ),
     ]
     collection = ActivityCollection(activities)
-    network = Network(collection)
+    network = create_network(collection)
     _calculate_latest_finish(network)
 
     assert collection[2].total_float == 7
@@ -107,7 +104,7 @@ def test_free_float() -> None:
     ]
 
     collection = ActivityCollection(activities)
-    network = Network(collection)
+    network = create_network(collection)
     _calculate_free_float(network)
 
     assert collection[2].free_float == 0

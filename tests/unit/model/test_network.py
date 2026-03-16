@@ -1,5 +1,5 @@
 from aoa.model.activity import Activity, ActivityCollection
-from aoa.model.network import Network
+from aoa.model.network import create_network
 from aoa.model.node import Node
 from aoa.model.node_dict import NodeDict
 
@@ -9,7 +9,7 @@ def test_one_activity():
         id=1,
     )
 
-    network = Network(ActivityCollection([activity]))
+    network = create_network(ActivityCollection([activity]))
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 2  # start and end nodes
     assert nodes[0].outbound_activities == [activity]
@@ -27,7 +27,7 @@ def test_two_sequential_activities():
         ),
     ]
 
-    network = Network(ActivityCollection(activities))
+    network = create_network(ActivityCollection(activities))
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 3  # start and end nodes
     assert nodes[0].outbound_activities == [activities[0]]
@@ -46,7 +46,7 @@ def test_two_parallel_activities():
         ),
     ]
 
-    network = Network(ActivityCollection(activities))
+    network = create_network(ActivityCollection(activities))
 
     # either the node is a start node, then  it should have two activities as outbound activities
     # or it is the end node and has one activity as inbound activity and one dummy activity as inbound activities
@@ -85,7 +85,7 @@ def test_three_parallel_activities():
         ),
     ]
 
-    network = Network(ActivityCollection(activities))
+    network = create_network(ActivityCollection(activities))
     # either the node is a start node, then  it should have all three activities as outbount activities
     # or it is the end node and has one activity as inbound activity and two dummy activities as inbound activities
     # or it has one activity as inbound activity and one dummy activity as outbound activity
@@ -126,7 +126,7 @@ def test_complex_network():
         Activity(id=11, predecessors={1, 2, 3, 4, 5}),
     ]
 
-    network = Network(ActivityCollection(activities))
+    network = create_network(ActivityCollection(activities))
     nodes: NodeDict = network.node_dict
     assert len(nodes) == 11
     assert nodes[set()].outbound_activities == [
@@ -179,7 +179,7 @@ def test_multiple_end_nodes() -> None:
         ),
     ]
 
-    network = Network(ActivityCollection(activities))
+    network = create_network(ActivityCollection(activities))
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 4
 

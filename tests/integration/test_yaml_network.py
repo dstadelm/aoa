@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pyfakefs.fake_filesystem import FakeFilesystem
 
-from aoa.model.network import Network
+from aoa.model.network import create_network
 from aoa.model.node import Node
 from aoa.model.project import load_yaml_project
 
@@ -27,7 +27,7 @@ activities:
     )
     project = load_yaml_project(Path("network.yaml"))
 
-    network = Network(project.get_activities())
+    network = create_network(project.get_activities())
     nodes: list[Node] = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 11
     assert nodes[0].outbound_activities == [
