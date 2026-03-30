@@ -18,7 +18,7 @@ class ActivityProtocol:
     duration: float
     earliest_start: float
     latest_finish: float
-    ealiest_finish: float
+    earliest_finish: float
     latest_start: float
     total_float: float
     free_float: float
@@ -112,7 +112,7 @@ def check_for_overconstraining(activities: ActivityCollection) -> None:
         intersection = downstream_predecessor_lut.get(activity.id, set()).intersection(activity.predecessors)
         if intersection:
             raise AllocationException(
-                f"Downstream activcities {intersection} detected as direct predecessors of activity {activity.id}"
+                f"Downstream activities {intersection} detected as direct predecessors of activity {activity.id}"
             )
 
 
