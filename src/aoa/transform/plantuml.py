@@ -46,9 +46,9 @@ title Pert: Project Design
     def _get_network(self) -> str:
         network = [
             (
-                f"{self.network.get_activity_start_node(activity).id} -{self._line_fmt(activity)}-> {self.network.get_activity_end_node(activity).id}"
-                if activity.is_dummy is Activity
-                else f"{self.network.get_activity_start_node(activity).id} -{self._line_fmt(activity)}-> {self.network.get_activity_end_node(activity).id} : {activity.activity} (Id={activity.id}, D={activity.duration}, TF={activity.total_float}, FF={activity.free_float})"
+                f"{self.network.get_activity_nodes(activity).start_node.id} -{self._line_fmt(activity)}-> {self.network.get_activity_nodes(activity).end_node.id}"
+                if activity.is_dummy
+                else f"{self.network.get_activity_nodes(activity).start_node.id} -{self._line_fmt(activity)}-> {self.network.get_activity_nodes(activity).end_node.id} : {activity.activity} (Id={activity.id}, D={activity.duration}, TF={activity.total_float}, FF={activity.free_float})"
             )
             for node in self.sorted_nodes
             for activity in node.outbound_activities
