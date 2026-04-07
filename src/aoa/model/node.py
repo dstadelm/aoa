@@ -1,46 +1,31 @@
+"""Node model for Activity-on-Arrow (AoA) network diagrams.
+
+Nodes represent events (points in time) in the network. Activities are
+attached to nodes via their inbound and outbound activity lists, which
+are maintained by :class:`NodeDict` through explicit method calls.
+"""
+
 from dataclasses import dataclass, field
-from typing import Callable, TypeVar, override
+from typing import override
 
 from .activity import Activity
-
-T = TypeVar("T")
-
-
-# observable list that notives observers when an item is added or removed, used for inbound and outbound activities of a node
-class ObservableList(list[T]):
-    def __init__(self):
-        super().__init__()
-        self.append_callback: Callable[[T], None] = (
-            lambda x: None
-        )  # placeholder, will be set by Node when creating the list
-        self.remove_callback: Callable[[T], None] = (
-            lambda x: None
-        )  # placeholder, will be set by Node when creating the list
-
-    @override
-    def append(self, item: T):
-        super().append(item)
-        self.append_callback(item)
-
-    @override
-    def remove(self, item: T):
-        super().remove(item)
-        self.remove_callback(item)
-
-    def register_append_callback(self, callback: Callable[[T], None]) -> None:
-        self.append_callback = callback
-
-    def register_remove_callback(self, callback: Callable[[T], None]) -> None:
-        self.remove_callback = callback
 
 
 @dataclass
 class Node:
+    """A node (event) in the AoA network.
+
+    Attributes:
+        _id: The unique identifier for this node.
+        inbound_activities: Activities arriving at this node.
+        outbound_activities: Activities departing from this node.
+        max_depth: The maximum topological depth of this node (used for ordering).
+    """
+
     _id: int
-    inbound_activities: ObservableList[Activity] = field(default_factory=ObservableList, repr=False, compare=False)
-    outbound_activities: ObservableList[Activity] = field(default_factory=ObservableList, repr=False, compare=False)
+    inbound_activities: list[Activity] = field(default_factory=list, repr=False, compare=False)
+    outbound_activities: list[Activity] = field(default_factory=list, repr=False, compare=False)
     max_depth: int = field(default=0, compare=False)
-    _id_change_callback: Callable[[int], None] = field(default=lambda x: None, repr=False, compare=False)
 
     @property
     def id(self) -> int:
@@ -52,10 +37,16 @@ class Node:
 
     @property
     def is_end(self) -> bool:
+        """Return True if this node has no outbound activities."""
         return len(self.outbound_activities) == 0
 
     @property
     def start_dependencies(self) -> set[int]:
+        """Return the set of activity IDs that this node depends on.
+
+        For real activities (id >= 0), the activity ID itself is a dependency.
+        For dummy activities (id < 0), the dummy's predecessors are used instead.
+        """
         start_dependencies = {activity.id for activity in self.inbound_activities if activity.id >= 0}
         dummy_start_dependencies = [activity.predecessors for activity in self.inbound_activities if activity.id < 0]
         return start_dependencies.union(*dummy_start_dependencies)
@@ -88,21 +79,6 @@ class Node:
             return "end"
         else:
             return "-".join(str(v) for v in sorted(self.start_dependencies))
-
-    def register_inbound_activity_append_callback(self, callback: Callable[[Activity], None]) -> None:
-        self.inbound_activities.register_append_callback(callback)
-
-    def register_outbound_activity_append_callback(self, callback: Callable[[Activity], None]) -> None:
-        self.outbound_activities.register_append_callback(callback)
-
-    def register_inbound_activity_remove_callback(self, callback: Callable[[Activity], None]) -> None:
-        self.inbound_activities.register_remove_callback(callback)
-
-    def register_outbound_activity_remove_callback(self, callback: Callable[[Activity], None]) -> None:
-        self.outbound_activities.register_remove_callback(callback)
-
-    def register_node_id_change_callback(self, callback: Callable[[int], None]) -> None:
-        self._id_change_callback = callback
 
 
 @dataclass

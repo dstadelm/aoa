@@ -1,40 +1,58 @@
-#!/usr/bin/env python3
+"""Network creation module for Activity-on-Arrow (AoA) diagrams.
+
+This module implements the core algorithm for building an AoA network from a
+collection of activities. The process follows four stages:
+
+1. **Allocation sequencing** — Topologically sort activities so each activity's
+   predecessors are processed first.
+2. **Activity allocation** — For each activity, find or create appropriate start
+   and end nodes, inserting dummy activities where necessary to maintain correct
+   dependency semantics.
+3. **End-node tying** — Merge all leaf (end) nodes into a single terminal node.
+4. **Node renumbering** — Reassign sequential node IDs based on topological depth.
+"""
+
 from __future__ import annotations
 
-from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass, field
-from functools import reduce
 
 from more_itertools import powerset
 
 from .activity import Activity, ActivityCollection
-from .exception import AllocationException
+from .exception import AllocationException, AoAException
 from .node import Node
 from .node_dict import ActivityNodes, NodeDict
 
 
 @dataclass
 class Network:
+    """Represents an Activity-on-Arrow network.
+
+    Attributes:
+        activities: The collection of activities (edges) in the network.
+        node_dict: The mapping of predecessor sets to nodes (events).
+    """
+
     activities: ActivityCollection
     node_dict: NodeDict = field(default_factory=NodeDict, compare=False)
 
     def get_node_list_sorted_by_depth(self) -> list[Node]:
-        """Iterate over all nodes and sort them by depth (depth of the graph from the root).
+        """Return all nodes sorted by depth (ascending node ID order).
 
         Returns:
-            list[Node]: All nodes sorted by depth
+            list[Node]: All nodes sorted by depth.
         """
         return sorted(self.node_dict.values(), key=lambda x: x.id)
 
     def get_activity_nodes(self, activity: Activity) -> ActivityNodes:
-        """Returns the start and end node for a given activity
+        """Return the start and end nodes for a given activity.
 
         Arguments:
-            activity (Activity): The activity
+            activity: The activity to look up.
 
         Returns:
-            ActivityNodes: The start and end node for the given activity
+            ActivityNodes: The start and end node for the given activity.
         """
         return self.node_dict.nodes_of(activity.id)
 
@@ -42,336 +60,402 @@ class Network:
 def create_network(activities: ActivityCollection) -> Network:
     """Factory method to create a network from a collection of activities.
 
+    The network is built in four stages:
+    1. Determine allocation sequence (topological sort).
+    2. Allocate each activity to start/end nodes.
+    3. Tie all leaf nodes into a single end node.
+    4. Renumber nodes sequentially by depth.
+
     Arguments:
-        activities (ActivityCollection): The collection of activities to create the network from
+        activities: The collection of activities to create the network from.
+
     Returns:
-        Network: The created network
+        Network: The created network.
     """
     network = Network(activities)
 
-    sorted_activities: list[Activity] = _get_allocation_sequence(copy(network.activities))
+    sorted_activities = _get_allocation_sequence(copy(network.activities))
     for activity in sorted_activities:
         _allocate_activity(activity, network)
-    _tie_end_node(network.activities, network.node_dict)
+    _tie_end_node(network)
     _renumber_nodes(network.node_dict)
 
     return network
 
 
-def power_subset(predecessors: list[int]) -> list[set[int]]:
-    """For a list of values returns all possible power sets from largest to smallest.
+# ---------------------------------------------------------------------------
+# Utility functions
+# ---------------------------------------------------------------------------
+
+
+def _sorted_power_set(predecessors: list[int]) -> list[set[int]]:
+    """Return all subsets of the given list, sorted from largest to smallest.
 
     Arguments:
-        predecessors (list[int]): The list of all predecessors
+        predecessors: The list of predecessor IDs.
 
     Returns:
-        list[set[int]]: A List of all possible sets from the giver predecessors
+        list[set[int]]: All possible subsets, largest first.
 
     Example:
-        >>> power_subset([1, 2, 3])
+        >>> _sorted_power_set([1, 2, 3])
         [{1, 2, 3}, {1, 2}, {1, 3}, {2, 3}, {1}, {2}, {3}, set()]
     """
-    powersets = [set(x) for x in list(powerset(predecessors))]
-    return sorted(powersets, key=lambda x: len(x), reverse=True)
-
-
-def _get_sets_that_contain_ids_in_id_set(id_set: set[int], activities: ActivityCollection) -> list[set[int]]:
-    """For a given set of ids returns all sets that contain any one of those ids.
-
-    Where a set is a group of activities which are together the predecessors of an activity
-
-    Arguments:
-        id_set (set[int]): A set of Ids
-
-    Returns:
-        list[set[int]]: A List of all sets that contain any one of the ids int the id_set
-
-    Example:
-
-        Activity 4 has predecessors 1, 2 and 3
-        Activity 5 has predecessors 1, 2
-
-        So for Activity 2 the sets in which it exists are {1, 2, 3} and {1, 2}
-    """
-
-    return [subset for id in id_set for subset in activities.reverse_predecessor_lut[id]]
-
-
-def _get_allocation_sequence(activities: ActivityCollection) -> list[Activity]:
-    """Determine the order in which activities must be allocated.
-
-    Activities are returned in an order where each activity's predecessors always
-    appear before the activity itself.
-
-    Arguments:
-        activities (ActivityCollection): The collection of activities to sequence
-
-    Returns:
-        list[Activity]: The activities sorted into a valid allocation order
-    """
-    allocated_activities: OrderedDict[int, Activity] = OrderedDict()
-
-    def get_allocation_sequence_recursion(
-        unallocated_activities: ActivityCollection,
-    ) -> list[Activity]:
-        """Recursive Function to determine a sequence in which the activities can be allocated.
-
-        An activity can be allocated, when all activities which the activity depends on have been allocated.
-
-        Arguments:
-            unallocated_activities (list[Activity]): The list of activities to allocate
-
-        Returns:
-            list[Activity]: The list of activities in the order of allocation
-        """
-        if not unallocated_activities:
-            return list(allocated_activities.values())
-
-        allocated_set = set(allocated_activities.keys())
-        for idx, activity in unallocated_activities.items():
-            activity_id: int = activity.id
-            if activity.predecessors.issubset(allocated_set):
-                allocated_activities[activity_id] = activity
-                del unallocated_activities[idx]
-                return get_allocation_sequence_recursion(unallocated_activities)
-
-        raise AllocationException(
-            f"Activities {[activity.id for activity in unallocated_activities.values()]}, can't be allocated as their dependencies can't be resolved"
-        )
-
-    return get_allocation_sequence_recursion(activities)
-
-
-def _renumber_nodes(node_dict: NodeDict) -> None:
-    """Renumber nodes to have a consecutive numbering for the nodes.
-
-    During the generation of the nodes some nodes can be tied together resulting in nodes getting dropped, therefore
-    the numbering is in order but there might be blanks. This method renumbers all nodes in sequential manner
-    without changing their order.
-    """
-    if len(node_dict.end_nodes) > 1:
-        end_node_ids = [node.id for node in node_dict.end_nodes]
-        raise Exception(f"Undefined end_node, multiple end nodes detected {end_node_ids}")
-    if len(node_dict.end_nodes) == 0:
-        raise Exception("Undefined end_node, no end node defined")
-
-    for index, node in enumerate(sorted(node_dict.values(), key=lambda node: node.max_depth)):
-        node.id = index
-
-
-def _tie_end_node(activities: ActivityCollection, node_dict: NodeDict) -> None:
-    """Ties leaf nodes to one end node.
-
-    The algorithm for allocating nodes leaves end nodes as they are. This function ties them to one common end node.
-    """
-
-    assert node_dict.end_nodes, "No end nodes available to tie."
-    tie_node = reduce(
-        lambda a, b: a if a.max_depth > b.max_depth else b,
-        node_dict.end_nodes,
-    )
-
-    for node in node_dict.end_nodes:
-        if node.id == tie_node.id:
-            continue
-        if node_dict.have_common_ancestor(node.id, tie_node.id):
-            _create_dummy_activity(node, tie_node, activities)
-        else:
-            for activity in node.inbound_activities:
-                # update the inbound activities
-                tie_node.inbound_activities.append(activity)
-
-
-def _attach_activity(activity: Activity, start_node: Node, end_node: Node) -> None:
-    """Attach an activity to a given start node and end node.
-
-    * The activity is added to the outbound activities of the start node.
-    * The activity is added to the inbound activities of the end node.
-
-    Arguments:
-        activity(Activity): The activity to attach
-        start_node(Node): The start node to which the activity is attached
-        end_node(Node): The end node to which the activity is attached
-    """
-    start_node.outbound_activities.append(activity)
-    end_node.inbound_activities.append(activity)
-
-
-def _create_dummy_activity(start_node: Node, end_node: Node, activities: ActivityCollection) -> None:
-    """Add a dummy activity between a start and end node.
-
-    Arguments:
-        start_node(Node): The starting node for the dummy activity
-        end_node(Node): The ending node for the dummy activity
-    """
-    dummy_activity = activities.new_dummy_activity()
-    dummy_activity.predecessors = start_node.start_dependencies
-    _attach_activity(dummy_activity, start_node, end_node)
-
-
-def _find_mergable_subset_for_set(id_set: set[int], network: Network) -> set[int] | None:
-    """
-    Search for nodes that can be merged with the provided set without violating the existing set
-
-    Arguments:
-        id_set(Set(int)): The set to be checked and merged
-
-    Returns:
-        Optional[set[int]]: The mergable subset that can be merged with the given id_set
-    """
-    subset = _find_tieable_node_for_set(id_set, network)
-    return subset if subset and len(subset) > 1 else None
-
-
-def _find_tieable_node_for_set(predecessors: set[int], network: Network) -> set[int]:
-    """
-    Searches over all existing sets and removes nodes which are bound by a existing set
-
-    Arguments:
-        predecessors(set[int]): A set of predecessor activities
-
-    Returns:
-        Optional[set[int]]: The activities that can be merged to one end node
-
-    """
-
-    # if there are no predecessors or the predecessors are already represented by a node then return the
-    # predecessors as they are
-    if (not predecessors) or (predecessors in network.node_dict):
-        return predecessors
-
-    mutable_node_id = predecessors.copy()
-    for pred_set in _get_sets_that_contain_ids_in_id_set(predecessors, network.activities):
-        if not predecessors.issubset(pred_set):
-            mutable_node_id.difference_update(pred_set)
-        # early exit if there are no more nodes that can be tied together
-        if not mutable_node_id:
-            return mutable_node_id
-
-    return mutable_node_id
-
-
-def _allocate_activity(activity: Activity, network: Network) -> None:
-    """Add the provided activity and link all dependencies to it."""
-    predecessors = activity.predecessors.copy()
-
-    def update_predecessors(node_id: set[int]) -> set[int]:
-        predecessors.difference_update(node_id)
-        return node_id
-
-    # if it exists find the node to which all predecessors can be bound
-    if tie_node_id := _find_tieable_node_for_set(predecessors.copy(), network):
-        _merge_subset(tie_node_id, network)
-        predecessors.difference_update(tie_node_id)
-
-    # find subsets that can be created from existing sub-subsets
-    mergeable_nodes = [
-        update_predecessors(node_id)
-        for subset in power_subset(list(predecessors))
-        if (node_id := _find_mergable_subset_for_set(subset, network))
-    ]
-
-    for node in mergeable_nodes:
-        _merge_subset(node, network)
-
-    remaining_nodes = [subset for subset in power_subset(list(predecessors)) if subset in network.node_dict]
-
-    dummy_link_start_nodes = _minimal_viable_list(mergeable_nodes + remaining_nodes)
-
-    # There are three cases what the tie node can be
-    # 1. A tie node determined earlier in the code
-    # 2. A dummy link start node (aggregate) -> a new node has to be created
-    # 3. No nodes are applicable so the remaining option is the start node
-    tie_node = (
-        network.node_dict[tie_node_id]
-        if tie_node_id
-        else network.node_dict.new_node() if dummy_link_start_nodes else network.node_dict.start_node  # floating node
-    )
-
-    for node in dummy_link_start_nodes:
-        _create_dummy_activity(
-            network.node_dict[node],
-            tie_node,
-            network.activities,
-        )
-    _attach_activity(activity, tie_node, end_node=network.node_dict.new_node())
-
-
-def _minimal_viable_list(list_of_sets: list[set[int]]) -> list[set[int]]:
-    """
-    From a list of sets which can contain nodes multiple times find the minimal set of sets that contains all dependencies but no duplicates
-    """
-    list_of_sets = sorted(list_of_sets, key=lambda x: len(x))
-    return _minimal_viable_list_recursion(list_of_sets, [])
-
-
-def _minimal_viable_list_recursion(start: list[set[int]], result: list[set[int]]) -> list[set[int]]:
-    if not start:
-        return result
-    result_union = _get_union(result)
-    target = result_union.union(_get_union(start))
-    if result_union.union(_get_union(start[1:])) != target:
-        result.append(start[0])
-    return _minimal_viable_list_recursion(start[1:], result)
+    power_sets = [set(x) for x in list(powerset(predecessors))]
+    return sorted(power_sets, key=lambda x: len(x), reverse=True)
 
 
 def _get_union(list_of_sets: list[set[int]]) -> set[int]:
     """Return the union of all sets in the list, or an empty set if the list is empty.
 
     Arguments:
-        list_of_sets (list[set[int]]): The list of sets to union
+        list_of_sets: The list of sets to union.
 
     Returns:
-        set[int]: The union of all sets, or an empty set if the list is empty
+        set[int]: The union of all sets.
     """
     if list_of_sets:
         return set.union(*list_of_sets)  # pyright: ignore [reportUnknownMemberType, reportUnknownVariableType]
+    return set()
+
+
+# ---------------------------------------------------------------------------
+# Allocation sequence
+# ---------------------------------------------------------------------------
+
+
+def _get_allocation_sequence(activities: ActivityCollection) -> list[Activity]:
+    """Determine the order in which activities must be allocated.
+
+    Activities are returned in topological order where each activity's
+    predecessors always appear before the activity itself. Uses an iterative
+    approach to avoid stack depth issues with large activity sets.
+
+    Arguments:
+        activities: The collection of activities to sequence.
+
+    Returns:
+        list[Activity]: The activities sorted into a valid allocation order.
+
+    Raises:
+        AllocationException: If dependencies cannot be resolved (e.g. cycles).
+    """
+    result: list[Activity] = []
+    allocated_ids: set[int] = set()
+    remaining = dict(activities)
+
+    while remaining:
+        allocated_in_pass = False
+        for idx, activity in list(remaining.items()):
+            if activity.predecessors.issubset(allocated_ids):
+                result.append(activity)
+                allocated_ids.add(activity.id)
+                del remaining[idx]
+                allocated_in_pass = True
+                break
+
+        if not allocated_in_pass:
+            unresolved = [a.id for a in remaining.values()]
+            raise AllocationException(
+                f"Activities {unresolved}, can't be allocated as their dependencies can't be resolved"
+            )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Node renumbering
+# ---------------------------------------------------------------------------
+
+
+def _renumber_nodes(node_dict: NodeDict) -> None:
+    """Renumber nodes to have consecutive IDs based on topological depth.
+
+    Delegates to :meth:`NodeDict.renumber_nodes` which reassigns sequential
+    IDs and rebuilds internal lookup tables.
+
+    Raises:
+        AoAException: If there are zero or multiple end nodes.
+    """
+    node_dict.renumber_nodes()
+
+
+# ---------------------------------------------------------------------------
+# End-node tying
+# ---------------------------------------------------------------------------
+
+
+def _tie_end_node(network: Network) -> None:
+    """Tie all leaf nodes into a single end node.
+
+    The allocation algorithm leaves end nodes as-is. This function merges them
+    into one common end node. Nodes sharing a common ancestor with the chosen
+    end node are linked via dummy activities; others have their inbound
+    activities moved directly.
+
+    Arguments:
+        network: The network being constructed.
+
+    Raises:
+        AoAException: If there are no end nodes to tie.
+    """
+    node_dict = network.node_dict
+
+    if not node_dict.end_nodes:
+        raise AoAException("No end nodes available to tie.")
+
+    tie_node = max(node_dict.end_nodes, key=lambda n: n.max_depth)
+
+    for node in node_dict.end_nodes:
+        if node.id == tie_node.id:
+            continue
+        if node_dict.have_common_ancestor(node.id, tie_node.id):
+            _create_dummy_activity(node, tie_node, network)
+        else:
+            for activity in list(node.inbound_activities):
+                node_dict.move_activity_to_node(activity, tie_node)
+
+
+# ---------------------------------------------------------------------------
+# Activity attachment helpers
+# ---------------------------------------------------------------------------
+
+
+def _create_dummy_activity(start_node: Node, end_node: Node, network: Network) -> None:
+    """Create and attach a zero-effort dummy activity between two nodes.
+
+    Arguments:
+        start_node: The starting node for the dummy activity.
+        end_node: The ending node for the dummy activity.
+        network: The network being constructed.
+    """
+    dummy_activity = network.activities.new_dummy_activity()
+    dummy_activity.predecessors = start_node.start_dependencies
+    network.node_dict.attach_activity(dummy_activity, start_node, end_node)
+
+
+# ---------------------------------------------------------------------------
+# Predecessor resolution
+# ---------------------------------------------------------------------------
+
+
+def _find_related_predecessor_sets(activity_ids: set[int], activities: ActivityCollection) -> list[set[int]]:
+    """Return all predecessor sets that contain any ID from the given set.
+
+    A predecessor set is the full set of predecessors for some activity. This
+    function finds every such set that overlaps with *activity_ids*.
+
+    Arguments:
+        activity_ids: A set of activity IDs to search for.
+        activities: The activity collection providing the reverse lookup.
+
+    Returns:
+        list[set[int]]: All predecessor sets containing at least one ID from *activity_ids*.
+
+    Example:
+        If activity 4 has predecessors {1, 2, 3} and activity 5 has predecessors
+        {1, 2}, then for activity_ids={2} the result is [{1, 2, 3}, {1, 2}].
+    """
+    return [pred_set for aid in activity_ids for pred_set in activities.reverse_predecessor_lut[aid]]
+
+
+def _find_resolvable_predecessors(predecessors: set[int], network: Network) -> set[int]:
+    """Find the subset of predecessors that can be bound to a single existing node.
+
+    Iterates over all existing predecessor sets and removes IDs that are
+    "locked" by another set (i.e. already committed to a different grouping),
+    returning only the IDs that are free to merge.
+
+    Arguments:
+        predecessors: The full set of predecessor activity IDs.
+        network: The network being constructed.
+
+    Returns:
+        set[int]: The subset of predecessors that can be resolved to one node.
+                  May be empty if no predecessors can be merged.
+    """
+    if not predecessors or predecessors in network.node_dict:
+        return predecessors
+
+    remaining = predecessors.copy()
+    for pred_set in _find_related_predecessor_sets(predecessors, network.activities):
+        if not predecessors.issubset(pred_set):
+            remaining.difference_update(pred_set)
+        if not remaining:
+            return remaining
+
+    return remaining
+
+
+def _find_mergeable_subset(candidate: set[int], network: Network) -> set[int] | None:
+    """Search for a subset of IDs that can be merged without violating existing groupings.
+
+    Returns the mergeable subset only if it contains more than one element
+    (single-element subsets don't need merging).
+
+    Arguments:
+        candidate: The candidate set of activity IDs to check.
+        network: The network being constructed.
+
+    Returns:
+        set[int] | None: The mergeable subset, or None if merging is not possible.
+    """
+    subset = _find_resolvable_predecessors(candidate, network)
+    return subset if subset and len(subset) > 1 else None
+
+
+# ---------------------------------------------------------------------------
+# Minimal covering sets
+# ---------------------------------------------------------------------------
+
+
+def _minimal_covering_sets(list_of_sets: list[set[int]]) -> list[set[int]]:
+    """Find the smallest list of sets that covers all elements without duplicates.
+
+    Given a list of sets (which may contain overlapping elements), return a
+    minimal sub-list whose union equals the union of the original list. Sets
+    are considered smallest-first, so larger sets are preferred as they cover
+    more elements at once.
+
+    Arguments:
+        list_of_sets: The candidate sets, potentially with overlapping elements.
+
+    Returns:
+        list[set[int]]: A minimal sub-list covering all elements.
+    """
+    sorted_sets = sorted(list_of_sets, key=lambda x: len(x))
+    result: list[set[int]] = []
+    target = _get_union(sorted_sets)
+
+    for i, candidate in enumerate(sorted_sets):
+        result_union = _get_union(result)
+        remaining_union = _get_union(sorted_sets[i + 1 :])
+        if result_union.union(remaining_union) != target:
+            result.append(candidate)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Activity allocation
+# ---------------------------------------------------------------------------
+
+
+def _allocate_activity(activity: Activity, network: Network) -> None:
+    """Allocate an activity to start and end nodes in the network.
+
+    Finds or creates appropriate start and end nodes for the given activity,
+    inserting dummy activities where needed to maintain dependency semantics.
+
+    The process involves:
+    1. Finding predecessors that can be resolved to an existing node.
+    2. Finding and merging additional predecessor subsets.
+    3. Linking remaining predecessor nodes via dummy activities.
+    4. Attaching the activity between the resolved start node and a new end node.
+
+    Arguments:
+        activity: The activity to allocate.
+        network: The network being constructed.
+    """
+    predecessors = activity.predecessors.copy()
+
+    # Step 1: Find the largest resolvable predecessor set and merge its nodes
+    tie_node_id = _find_resolvable_predecessors(predecessors.copy(), network)
+    if tie_node_id:
+        _merge_subset(tie_node_id, network)
+        predecessors.difference_update(tie_node_id)
+
+    # Step 2: Find and merge additional predecessor subsets
+    mergeable_nodes: list[set[int]] = []
+    for subset in _sorted_power_set(list(predecessors)):
+        node_id = _find_mergeable_subset(subset, network)
+        if node_id:
+            predecessors.difference_update(node_id)
+            mergeable_nodes.append(node_id)
+
+    for node_set in mergeable_nodes:
+        _merge_subset(node_set, network)
+
+    # Step 3: Collect remaining predecessor nodes already present in the network
+    remaining_nodes = [subset for subset in _sorted_power_set(list(predecessors)) if subset in network.node_dict]
+
+    # Step 4: Find the minimal set of nodes needed for dummy links
+    dummy_link_sources = _minimal_covering_sets(mergeable_nodes + remaining_nodes)
+
+    # Step 5: Determine the start node for this activity
+    if tie_node_id:
+        start_node = network.node_dict[tie_node_id]
+    elif dummy_link_sources:
+        start_node = network.node_dict.new_node()
     else:
-        return set()
+        start_node = network.node_dict.start_node
+
+    # Step 6: Create dummy activities linking predecessor nodes to the start node
+    for node_set in dummy_link_sources:
+        _create_dummy_activity(network.node_dict[node_set], start_node, network)
+
+    # Step 7: Attach the activity from start node to a new end node
+    network.node_dict.attach_activity(activity, start_node, end_node=network.node_dict.new_node())
+
+
+# ---------------------------------------------------------------------------
+# Node merging
+# ---------------------------------------------------------------------------
 
 
 def _merge_subset(merge_set: set[int], network: Network) -> None:
-    """
-    As subsets of the to be merged subset could potentially already have been merged the following steps are required
-    1. go through each subset of the subset and check if there is a activity with that id
-    2. if activity with such an id exists add the activity id to the list of activity ids to link
-    3. remove virtual node subset from orig subset
-    4. if len of orig subset > 0 goto 1
-    """
-    activity_ids_to_link: list[set[int]] = []
-    mutable_merge_set = merge_set.copy()
-    while mutable_merge_set:
-        old_mutable_merge_set = mutable_merge_set.copy()
-        for subset in power_subset(list(mutable_merge_set)):
-            if set(subset) in network.node_dict:
-                activity_ids_to_link.append(set(subset))
-                mutable_merge_set.difference_update(subset)
-                break
-        if old_mutable_merge_set == mutable_merge_set:
-            raise Exception("Unable to merge subset")
-    if activity_ids_to_link:
-        _recursive_merge(activity_ids_to_link[0], activity_ids_to_link[1:], network)
+    """Decompose a merge set into existing nodes and merge them together.
 
-
-def _recursive_merge(head: set[int], tail: list[set[int]], network: Network) -> None:
-    """Recursively merge a list of node sets into a single node.
-
-    Nodes that share a common ancestor are linked via a dummy activity; otherwise
-    their inbound activities are moved directly onto the head node.
+    Since subsets of the merge set may already have been merged into existing
+    nodes, this function:
+    1. Finds existing nodes that together cover the merge set (largest first).
+    2. Merges all found nodes into a single node.
 
     Arguments:
-        head (set[int]): The node set that acts as the merge target
-        tail (list[set[int]]): The remaining node sets to merge into head
-        network (Network): The network containing the activities and node dictionary
-    """
-    new_head: set[int] = set()
-    node_dict = network.node_dict
-    if tail:
-        if node_dict.have_common_ancestor(node_dict[head].id, node_dict[tail[0]].id):
-            _create_dummy_activity(node_dict[tail[0]], node_dict[head], network.activities)
-            new_head = node_dict[head].start_dependencies
-        else:
-            for activity in node_dict[tail[0]].inbound_activities:
-                node_dict[head].inbound_activities.append(activity)
+        merge_set: The set of predecessor activity IDs to merge.
+        network: The network being constructed.
 
-        _recursive_merge(new_head, tail[1:], network)
+    Raises:
+        AoAException: If the merge set cannot be decomposed into existing nodes.
+    """
+    node_sets_to_link: list[set[int]] = []
+    remaining = merge_set.copy()
+
+    while remaining:
+        previous_remaining = remaining.copy()
+        for subset in _sorted_power_set(list(remaining)):
+            if set(subset) in network.node_dict:
+                node_sets_to_link.append(set(subset))
+                remaining.difference_update(subset)
+                break
+        if previous_remaining == remaining:
+            raise AoAException("Unable to merge subset")
+
+    _merge_node_sets(node_sets_to_link, network)
+
+
+def _merge_node_sets(node_sets: list[set[int]], network: Network) -> None:
+    """Merge a list of node sets into a single node.
+
+    Iterates through the node sets, merging each into the first (head) node.
+    Nodes that share a common ancestor with the head are linked via a dummy
+    activity; otherwise their inbound activities are moved directly.
+
+    Arguments:
+        node_sets: The node sets to merge (first set is the initial merge target).
+        network: The network being constructed.
+    """
+    if len(node_sets) < 2:
+        return
+
+    node_dict = network.node_dict
+    head_node = node_dict[node_sets[0]]
+
+    for tail_key in node_sets[1:]:
+        tail_node = node_dict[tail_key]
+
+        if node_dict.have_common_ancestor(head_node.id, tail_node.id):
+            _create_dummy_activity(tail_node, head_node, network)
+        else:
+            for activity in list(tail_node.inbound_activities):
+                node_dict.move_activity_to_node(activity, head_node)
