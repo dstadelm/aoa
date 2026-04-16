@@ -21,6 +21,9 @@ drawsvg = "^2.4.1"
 cairosvg = "^2.8.2"
 numpy = "^2.4.1"
 networkx = "^3.6.1"
+pygraphviz = "^1.14"
+matplotlib = "^3.10.8"
+fast-sugiyama = "^0.5.2"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.7.0"
