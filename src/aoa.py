@@ -8,7 +8,7 @@ from matplotlib import image as mpimg
 from matplotlib import pyplot as plt
 
 from aoa.model.cpm import calculate_cpm
-from aoa.model.network import Network
+from aoa.model.network import Network, create_network
 from aoa.model.project import load_yaml_project
 from aoa.transform.coloring_strategy import ColoringStrategies
 from aoa.transform.dot import create_dot
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     logger.setLevel(logging.DEBUG)
     file = Path("tests/artefacts/more_tricky.yaml")
     project = load_yaml_project(file)
-    network = Network(project.get_activities())
+    network = create_network(project.get_activities())
     calculate_cpm(network)
     # plantuml = PlantUml(network)
     # print(plantuml.get_txt())
@@ -37,10 +37,10 @@ if __name__ == "__main__":
     # nx.draw_networkx(nwx, pos=pos, with_labels=True, node_size=150)
     gvz = create_dot(nwx, ColoringStrategies.exponential)
     #
-    # _ = gvz.draw(file.with_suffix(".png"))
+    _ = gvz.draw(file.with_suffix(".png"))
     _ = gvz.draw(file.with_suffix(".svg"))
-    # image = mpimg.imread(file.with_suffix(".png"))
-    # plt.title(str(file.with_suffix("")))
-    # plt.axis("off")
-    # plt.imshow(image)
+    image = mpimg.imread(file.with_suffix(".png"))
+    plt.title(str(file.with_suffix("")))
+    plt.axis("off")
+    plt.imshow(image)
     plt.show()
