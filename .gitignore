@@ -2,3 +2,4 @@
 poetry.lock
 **.svg
 **.png
+tmp/**
