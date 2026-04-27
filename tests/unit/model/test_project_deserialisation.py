@@ -148,7 +148,7 @@ def test_load_activities() -> None:
 
 def test_load_resource() -> None:
     project_dict: ProjectDictType = {
-        "resources": [{"id": "TJ", "name": "Tom and Jerry", "weekdays": "1110100", "pensum": 0.8, "holidays": []}]
+        "resources": [{"id": "TJ", "name": "Tom and Jerry", "weekdays": "1110100", "workload": 0.8, "holidays": []}]
     }
     project = deserialize_project(project_dict)
     assert len(project.resources) == 1
@@ -156,7 +156,7 @@ def test_load_resource() -> None:
     resource = project.resources[0]
     assert resource.id == "TJ"
     assert resource.name == "Tom and Jerry"
-    assert resource.pensum == "0.8"
+    assert resource.workload == "0.8"
     assert resource.weekdays == "1110100"
     assert resource.holidays == []
 
@@ -164,12 +164,12 @@ def test_load_resource() -> None:
 def test_load_resources() -> None:
     project_dict: ProjectDictType = {
         "resources": [
-            {"id": "TJ", "name": "Tom and Jerry", "weekdays": "1110100", "pensum": 0.8, "holidays": []},
+            {"id": "TJ", "name": "Tom and Jerry", "weekdays": "1110100", "workload": 0.8, "holidays": []},
             {
                 "id": "SC",
                 "name": "Sylvester and Cat",
                 "weekdays": "1111100",
-                "pensum": 1.0,
+                "workload": 1.0,
                 "holidays": [datetime(2024, 12, 25).date(), datetime(2024, 12, 26).date()],
             },
         ]
@@ -180,13 +180,13 @@ def test_load_resources() -> None:
     resource_1 = project.resources[0]
     assert resource_1.id == "TJ"
     assert resource_1.name == "Tom and Jerry"
-    assert resource_1.pensum == "0.8"
+    assert resource_1.workload == "0.8"
     assert resource_1.weekdays == "1110100"
     assert resource_1.holidays == []
 
     resource_2 = project.resources[1]
     assert resource_2.id == "SC"
     assert resource_2.name == "Sylvester and Cat"
-    assert resource_2.pensum == "1.0"
+    assert resource_2.workload == "1.0"
     assert resource_2.weekdays == "1111100"
     assert resource_2.holidays == ["2024-12-25", "2024-12-26"]
