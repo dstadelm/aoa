@@ -56,6 +56,18 @@ class Network:
         """
         return self.node_dict.nodes_of(activity.id)
 
+    def get_activity_start_node(self, activity: Activity) -> Node:
+        """Return the start node for a given activity."""
+        nodes = self.node_dict.nodes_of(activity.id)
+        assert nodes.start_node is not None
+        return nodes.start_node
+
+    def get_activity_end_node(self, activity: Activity) -> Node:
+        """Return the end node for a given activity."""
+        nodes = self.node_dict.nodes_of(activity.id)
+        assert nodes.end_node is not None
+        return nodes.end_node
+
 
 def create_network(activities: ActivityCollection) -> Network:
     """Factory method to create a network from a collection of activities.

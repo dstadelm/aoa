@@ -65,3 +65,74 @@ def load_yaml_project(config: Path) -> Project:
     with open(config, "r") as f:
         _yaml_project: ProjectDictType = yaml.safe_load(f)  # pyright: ignore [reportAny]
         return deserialize_project(_yaml_project)
+
+
+def _serialize_project(project: Project) -> ProjectDictType:
+    """Convert a Project back into a plain dict suitable for YAML serialization."""
+    result: ProjectDictType = {}
+
+    result["start"] = project.start
+
+    if project.resources:
+        result["resources"] = [
+            {
+                k: v
+                for k, v in {
+                    "id": r.id,
+                    "name": r.name,
+                    "workload": r.workload,
+                    "weekdays": r.weekdays,
+                    "holidays": r.holidays if r.holidays else None,
+                }.items()
+                if v is not None and v != "" and v != []
+            }
+            for r in project.resources
+        ]
+
+    if project.milestones:
+        result["milestones"] = [
+            {
+                k: v
+                for k, v in {
+                    "id": m.id,
+                    "description": m.description,
+                    "owner": m.owner,
+                    "due_date": m.due_date,
+                    "state": m.state.name,
+                }.items()
+                if v is not None and v != ""
+            }
+            for m in project.milestones
+        ]
+
+    if project.activities:
+        result["activities"] = [
+            {
+                k: v
+                for k, v in {
+                    "id": a.id,
+                    "activity": a.activity,
+                    "predecessors": sorted(a.predecessors) if a.predecessors else None,
+                    "effort": a.effort if a.effort else None,
+                    "owner": a.owner,
+                    "resource": a.resource,
+                    "state": a.state.name if a.state != State.OPEN else None,
+                }.items()
+                if v is not None and v != "" and v != 0
+            }
+            for a in project.activities
+        ]
+
+    return result
+
+
+def save_yaml_project(project: Project, config: Path) -> None:
+    """Serialize a Project and write it to a YAML file.
+
+    Arguments:
+        project: The project to serialize.
+        config: The file path to write the YAML output to.
+    """
+    project_dict = _serialize_project(project)
+    with open(config, "w") as f:
+        yaml.dump(project_dict, f, default_flow_style=False, sort_keys=False, allow_unicode=True)

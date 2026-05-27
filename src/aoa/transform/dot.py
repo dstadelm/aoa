@@ -18,6 +18,7 @@ def create_dot(graph: nx.DiGraph, coloring_strategy: ColoringStrategyProtocol) -
     # gvz.graph_attr["splines"] = "line"
     gvz = rank_dot_nodes(graph, gvz)
     gvz.graph_attr["rankdir"] = "TB"
+    gvz.graph_attr["bgcolor"] = "transparent"
     gvz.layout(prog="dot", args="-Nshape=Mrecord")
     print(gvz)
     return gvz
