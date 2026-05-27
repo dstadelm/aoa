@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AoA - Activity on Arrow</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Activity on Arrow</h1>
+      <div class="toolbar">
+        <label class="file-label">
+          File path:
+          <input type="text" id="file-path" placeholder="path/to/project.yaml" />
+        </label>
+        <button id="btn-load">Load YAML</button>
+        <button id="btn-save">Save YAML</button>
+        <button id="btn-compute" class="primary">Compute Network</button>
+        <span id="status-msg" class="status-msg"></span>
+        <div class="theme-selector">
+          <label for="theme-select">Theme:</label>
+          <select id="theme-select">
+            <optgroup label="Light">
+              <option value="material-light">Material Light</option>
+              <option value="catppuccin-latte">Catppuccin Latte</option>
+              <option value="tokyonight-day">Tokyo Night Day</option>
+            </optgroup>
+            <optgroup label="Dark">
+              <option value="darcula">Darcula</option>
+              <option value="catppuccin-mocha">Catppuccin Mocha</option>
+              <option value="material-dark">Material Dark</option>
+              <option value="kanagawa">Kanagawa</option>
+              <option value="sonokai">Sonokai</option>
+              <option value="tokyonight">Tokyo Night</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="top-section">
+        <nav class="tab-bar">
+          <button class="tab-btn active" data-tab="activities">Activities</button>
+          <button class="tab-btn" data-tab="resources">Resources</button>
+          <button class="tab-btn" data-tab="milestones">Milestones</button>
+          <button id="btn-collapse" class="collapse-btn" title="Collapse/Expand tables">&#x25B2;</button>
+        </nav>
+        <div id="table-container" class="table-container"></div>
+      </section>
+
+      <section id="bottom-section">
+        <div class="graph-toolbar">
+          <h2>Network Diagram</h2>
+          <label>Renderer:
+            <select id="opt-renderer">
+              <option value="d3-dagre">d3-dagre</option>
+              <option value="graphviz">Graphviz DOT</option>
+            </select>
+          </label>
+          <label class="dagre-only">Ranker:
+            <select id="opt-ranker">
+              <option value="network-simplex">Network Simplex</option>
+              <option value="tight-tree">Tight Tree</option>
+              <option value="longest-path">Longest Path</option>
+            </select>
+          </label>
+          <label class="dagre-only">Direction:
+            <select id="opt-rankdir">
+              <option value="TB">Top → Bottom</option>
+              <option value="LR">Left → Right</option>
+              <option value="BT">Bottom → Top</option>
+              <option value="RL">Right → Left</option>
+            </select>
+          </label>
+          <label class="dagre-only">Align:
+            <select id="opt-align">
+              <option value="">None</option>
+              <option value="UL">Up-Left</option>
+              <option value="UR">Up-Right</option>
+              <option value="DL">Down-Left</option>
+              <option value="DR">Down-Right</option>
+            </select>
+          </label>
+        </div>
+        <div id="graph-container" class="graph-container"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
