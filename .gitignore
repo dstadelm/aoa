@@ -3,3 +3,5 @@ poetry.lock
 **.svg
 **.png
 tmp/**
+frontend/node_modules
+frontend/dist
