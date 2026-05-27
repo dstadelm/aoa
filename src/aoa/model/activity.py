@@ -15,7 +15,6 @@ class ActivityProtocol:
     id: int
     predecessors: set[int]
     effort: float
-    duration: float
     earliest_start: float
     latest_finish: float
     earliest_finish: float

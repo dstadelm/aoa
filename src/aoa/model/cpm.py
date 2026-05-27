@@ -1,3 +1,5 @@
+from dataclasses import dataclass, field
+
 from aoa.model.network import Network
 
 

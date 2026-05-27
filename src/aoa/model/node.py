@@ -82,6 +82,21 @@ class Node:
 
 
 @dataclass
+class CPMNode(Node):
+    """A node in the AoA network with additional CPM-related attributes.
+
+    Attributes:
+        earliest_start: The earliest possible start time for this node.
+        latest_finish: The latest possible finish time for this node.
+        free_float: The free float associated with this node.
+    """
+
+    earliest_start: float = field(default=0.0, compare=False)
+    latest_finish: float = field(default=0.0, compare=False)
+    free_float: float = field(default=0.0, compare=False)
+
+
+@dataclass
 class NodeCollection(dict[int, Node]):
     def __init__(self, nodes: list[Node]):
         super().__init__((node.id, node) for node in nodes)
