@@ -234,7 +234,7 @@ def _tie_end_node(network: Network) -> None:
 
 
 def _create_dummy_activity(start_node: Node, end_node: Node, network: Network) -> None:
-    """Create and attach a zero-effort dummy activity between two nodes.
+    """Create and attach a zero planned effort dummy activity between two nodes.
 
     Arguments:
         start_node: The starting node for the dummy activity.

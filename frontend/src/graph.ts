@@ -155,7 +155,7 @@ export function renderGraph(container: HTMLElement, data: GraphData, options?: L
     // Tooltip
     const title = e.isDummy
       ? `Dummy [${e.activityId}]`
-      : `[${e.activityId}] ${e.label}\nES: ${e.earliestStart}  D: ${e.effort}  EF: ${e.earliestFinish}\nLS: ${e.latestStart}  TF: ${e.totalFloat}  LF: ${e.latestFinish}\nFF: ${e.freeFloat}`;
+      : `[${e.activityId}] ${e.label}\nES: ${e.earliestStart}  D: ${e.planned_effort}  EF: ${e.earliestFinish}\nLS: ${e.latestStart}  TF: ${e.totalFloat}  LF: ${e.latestFinish}\nFF: ${e.freeFloat}`;
     path.append("title").text(title);
 
     // Edge label

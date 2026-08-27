@@ -4,7 +4,7 @@ export interface ActivityData {
   id: number;
   activity: string;
   predecessors: number[];
-  effort: number;
+  planned_effort: number;
   owner: string;
   resource: string;
   state: string;
@@ -50,7 +50,7 @@ export interface GraphEdge {
   isDummy: boolean;
   critical: boolean;
   color: string;
-  effort: number;
+  planned_effort: number;
   earliestStart: number;
   earliestFinish: number;
   latestStart: number;

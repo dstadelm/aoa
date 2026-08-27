@@ -80,7 +80,7 @@ def test_load_activity() -> None:
                 "id": 1,
                 "activity": "activity 1",
                 "state": "DONE",
-                "effort": 40,
+                "planned_effort": 40,
                 "owner": "owner",
                 "resource": "ressource",
             }
@@ -94,7 +94,7 @@ def test_load_activity() -> None:
     assert activity.id == 1
     assert activity.activity == "activity 1"
     assert activity.state == State.DONE
-    assert activity.effort == 40
+    assert activity.planned_effort == 40
     assert activity.owner == "owner"
     assert activity.resource == "ressource"
     assert activity.predecessors == set()
@@ -108,7 +108,7 @@ def test_load_activities() -> None:
                 "id": 1,
                 "activity": "activity 1",
                 "state": "DONE",
-                "effort": 40,
+                "planned_effort": 40,
                 "owner": "owner_a",
                 "resource": "ressource_a",
             },
@@ -117,7 +117,7 @@ def test_load_activities() -> None:
                 "predecessors": [1],
                 "activity": "activity 2",
                 "state": "IN_PROGRESS",
-                "effort": 5,
+                "planned_effort": 5,
                 "owner": "owner_b",
                 "resource": "resource_b",
             },
@@ -131,7 +131,7 @@ def test_load_activities() -> None:
     assert activity_1.id == 1
     assert activity_1.activity == "activity 1"
     assert activity_1.state == State.DONE
-    assert activity_1.effort == 40
+    assert activity_1.planned_effort == 40
     assert activity_1.owner == "owner_a"
     assert activity_1.resource == "ressource_a"
     assert activity_1.predecessors == set()
@@ -140,7 +140,7 @@ def test_load_activities() -> None:
     assert activity_2.id == 2
     assert activity_2.activity == "activity 2"
     assert activity_2.state == State.IN_PROGRESS
-    assert activity_2.effort == 5
+    assert activity_2.planned_effort == 5
     assert activity_2.owner == "owner_b"
     assert activity_2.resource == "resource_b"
     assert activity_2.predecessors == {1}

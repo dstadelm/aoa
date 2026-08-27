@@ -13,17 +13,17 @@ resources:
 activities:
 - id: 1
   activity: define topp level requirements
-  effort: 10.0
+  planned_effort: 10.0
   owner: zf
   resource: DST
 - id: 2
   activity: setup organisation tools
-  effort: 2.0
+  planned_effort: 2.0
   owner: unknown
   resource: DST
 - id: 3
   activity: analyse memory requirements
-  effort: 15.0
+  planned_effort: 15.0
   owner: scs
   resource: DST
 - id: 4
@@ -32,7 +32,7 @@ activities:
   - 1
   - 2
   - 3
-  effort: 5.0
+  planned_effort: 5.0
   owner: zf
   resource: DST
 - id: 5
@@ -41,7 +41,7 @@ activities:
   - 1
   - 2
   - 3
-  effort: 10.0
+  planned_effort: 10.0
   owner: zf
   resource: DST
 - id: 6
@@ -50,7 +50,7 @@ activities:
   - 1
   - 2
   - 3
-  effort: 5.0
+  planned_effort: 5.0
   owner: dc
   resource: DST
 - id: 7
@@ -59,7 +59,7 @@ activities:
   - 1
   - 2
   - 3
-  effort: 5.0
+  planned_effort: 5.0
   owner: zf
   resource: DST
 - id: 8
@@ -67,35 +67,35 @@ activities:
   predecessors:
   - 4
   - 5
-  effort: 5.0
+  planned_effort: 5.0
   owner: unknown
   resource: DST
 - id: 9
   activity: dsp assessement
   predecessors:
   - 8
-  effort: 5.0
+  planned_effort: 5.0
   owner: unknown
   resource: DST
 - id: 10
   activity: define arch of FFTs
   predecessors:
   - 5
-  effort: 10.0
+  planned_effort: 10.0
   owner: scs
   resource: DST
 - id: 11
   activity: analyse FuSa implications on arch
   predecessors:
   - 6
-  effort: 5.0
+  planned_effort: 5.0
   owner: scs
   resource: DST
 - id: 12
   activity: analyse HIL implications on arch
   predecessors:
   - 7
-  effort: 5.0
+  planned_effort: 5.0
   owner: scs
   resource: DST
 - id: 13
@@ -104,20 +104,20 @@ activities:
   - 10
   - 11
   - 12
-  effort: 5.0
+  planned_effort: 5.0
   owner: scs
   resource: DST
 - id: 14
   activity: transition unchaged code to ASIC
   predecessors:
   - 13
-  effort: 30.0
+  planned_effort: 30.0
   owner: dc
   resource: DST
 - id: 15
   activity: implement required changes
   predecessors:
   - 13
-  effort: 40.0
+  planned_effort: 40.0
   owner: scs
   resource: DST

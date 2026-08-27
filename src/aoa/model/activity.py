@@ -14,7 +14,7 @@ from .state import State
 class ActivityProtocol:
     id: int
     predecessors: set[int]
-    effort: float
+    planned_effort: float
     earliest_start: float
     latest_finish: float
     earliest_finish: float
@@ -26,7 +26,7 @@ class ActivityProtocol:
 @define
 class Activity:
     id: int
-    effort: float = field(default=0.0, eq=False)
+    planned_effort: float = field(default=0.0, eq=False)
     resource: str = field(default="", eq=False)
     owner: str = field(default="", eq=False)
     activity: str = field(default="", eq=False)
@@ -50,7 +50,7 @@ class Activity:
 
     @property
     def duration(self) -> float:
-        return self.effort
+        return self.planned_effort
 
     @property
     def total_float(self) -> float:
@@ -63,7 +63,7 @@ class Activity:
 
     @property
     def is_dummy(self) -> bool:
-        """Returns true if the activity is a dummy activity (i.e., has zero effort and no resource)"""
+        """Returns true if the activity is a dummy activity (i.e., has zero planned effort and no resource)"""
         return self.id < 0
 
 

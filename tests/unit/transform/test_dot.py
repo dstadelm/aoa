@@ -9,10 +9,10 @@ from aoa.transform.to_networkx import to_networkx
 
 def _build_network():
     activities = [
-        Activity(id=1, effort=5),
-        Activity(id=2, effort=3, predecessors=set([1])),
-        Activity(id=3, effort=5),
-        Activity(id=4, effort=5, predecessors=set([3])),
+        Activity(id=1, planned_effort=5),
+        Activity(id=2, planned_effort=3, predecessors=set([1])),
+        Activity(id=3, planned_effort=5),
+        Activity(id=4, planned_effort=5, predecessors=set([3])),
     ]
     network = create_network(ActivityCollection(activities))
     calculate_cpm(network)

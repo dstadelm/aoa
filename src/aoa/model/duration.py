@@ -3,7 +3,7 @@ from aoa.model.resources import ResourceCollection
 
 
 def duration(activity: Activity, ressources: ResourceCollection) -> float:
-    """Calculate the duration of an activity based on its effort and the resource's workload.
+    """Calculate the duration of an activity based on its planned effort and the resource's workload.
 
     Args:
         activity (Activity): The activity to calculate the duration for
@@ -15,7 +15,7 @@ def duration(activity: Activity, ressources: ResourceCollection) -> float:
         return 0.0
 
     if not activity.resource:
-        return activity.effort
+        return activity.planned_effort
 
     resource = ressources.get(activity.resource, None)
     if not resource:
@@ -26,4 +26,4 @@ def duration(activity: Activity, ressources: ResourceCollection) -> float:
     if workload <= 0:
         raise ValueError(f"Resource {resource.id} has invalid workload {resource.workload}")
 
-    return activity.effort / workload
+    return activity.planned_effort / workload

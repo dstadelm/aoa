@@ -13,20 +13,20 @@ def test_simple_diamond_pert() -> None:
     activities = [
         Activity(
             id=1,
-            effort=5,
+            planned_effort=5,
         ),
         Activity(
             id=2,
-            effort=3,
+            planned_effort=3,
             predecessors=set([1]),
         ),
         Activity(
             id=3,
-            effort=5,
+            planned_effort=5,
         ),
         Activity(
             id=4,
-            effort=5,
+            planned_effort=5,
             predecessors=set([3]),
         ),
     ]
@@ -72,24 +72,24 @@ def test_simple_gantt() -> None:
         Activity(
             id=1,
             activity="Start Project",
-            effort=5,
+            planned_effort=5,
         ),
         Activity(
             id=2,
             activity="Design Phase",
-            effort=3,
+            planned_effort=3,
             predecessors=set([1]),
         ),
         Activity(
             id=3,
             activity="Implementation Phase",
-            effort=5,
+            planned_effort=5,
             predecessors=set([2]),
         ),
         Activity(
             id=4,
             activity="Testing Phase",
-            effort=5,
+            planned_effort=5,
             predecessors=set([3]),
         ),
     ]
@@ -120,10 +120,10 @@ printscale weekly
 
 def _diamond_network():
     activities = [
-        Activity(id=1, effort=5),
-        Activity(id=2, effort=3, predecessors=set([1])),
-        Activity(id=3, effort=5),
-        Activity(id=4, effort=5, predecessors=set([3])),
+        Activity(id=1, planned_effort=5),
+        Activity(id=2, planned_effort=3, predecessors=set([1])),
+        Activity(id=3, planned_effort=5),
+        Activity(id=4, planned_effort=5, predecessors=set([3])),
     ]
     network = create_network(ActivityCollection(activities))
     calculate_cpm(network)

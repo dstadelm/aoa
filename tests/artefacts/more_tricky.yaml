@@ -2,50 +2,50 @@ start: 2026-05-27
 activities:
 - id: 1
   activity: activity
-  effort: 6.0
+  planned_effort: 6.0
 - id: 2
   activity: b
-  effort: 7.0
+  planned_effort: 7.0
 - id: 3
   activity: c
-  effort: 8.0
+  planned_effort: 8.0
 - id: 4
   activity: d
-  effort: 9.0
+  planned_effort: 9.0
 - id: 5
   activity: e
-  effort: 10.0
+  planned_effort: 10.0
 - id: 6
   activity: f
   predecessors:
   - 1
   - 2
-  effort: 5.0
+  planned_effort: 5.0
 - id: 7
   activity: g
   predecessors:
   - 2
   - 3
-  effort: 5.0
+  planned_effort: 5.0
 - id: 8
   activity: h
   predecessors:
   - 3
   - 4
-  effort: 5.0
+  planned_effort: 5.0
 - id: 9
   activity: i
   predecessors:
   - 4
   - 5
-  effort: 5.0
+  planned_effort: 5.0
 - id: 10
   activity: j
   predecessors:
   - 1
   - 2
   - 3
-  effort: 6.0
+  planned_effort: 6.0
 - id: 11
   activity: k
   predecessors:
@@ -54,4 +54,4 @@ activities:
   - 3
   - 4
   - 5
-  effort: 7.0
+  planned_effort: 7.0

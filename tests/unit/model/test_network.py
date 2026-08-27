@@ -156,25 +156,25 @@ def test_multiple_end_nodes() -> None:
     activities = [
         Activity(
             id=1,
-            effort=10,
+            planned_effort=10,
         ),
         Activity(
             id=2,
-            effort=1,
+            planned_effort=1,
         ),
         Activity(
             id=3,
-            effort=1,
+            planned_effort=1,
             predecessors={2},
         ),
         Activity(
             id=4,
-            effort=1,
+            planned_effort=1,
             predecessors={3},
         ),
         Activity(
             id=5,
-            effort=1,
+            planned_effort=1,
             predecessors={2},
         ),
     ]

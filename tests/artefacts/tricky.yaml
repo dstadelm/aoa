@@ -1,17 +1,17 @@
 activities:
 - id: 1
   activity: A
-  effort: 5.0
+  planned_effort: 5.0
   owner: zf
   resource: dummy
 - id: 2
   activity: B
-  effort: 5.0
+  planned_effort: 5.0
   owner: unknown
   resource: dummy
 - id: 3
   activity: C
-  effort: 5.0
+  planned_effort: 5.0
   owner: scs
   resource: dummy
 - id: 4
@@ -20,7 +20,7 @@ activities:
   - 1
   - 2
   - 3
-  effort: 5.0
+  planned_effort: 5.0
   owner: zf
   resource: dummy
 - id: 5
@@ -28,7 +28,7 @@ activities:
   predecessors:
   - 2
   - 3
-  effort: 5.0
+  planned_effort: 5.0
   owner: zf
   resource: dummy
 - id: 6
@@ -36,6 +36,6 @@ activities:
   predecessors:
   - 1
   - 2
-  effort: 5.0
+  planned_effort: 5.0
   owner: dc
   resource: dummy
