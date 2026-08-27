@@ -36,12 +36,19 @@ def find_max_float(graph: nx.DiGraph):
 
 
 def color_graph(graph: nx.DiGraph, low_float_threshold: int, medium_float_threshold: int):
+    """Tag each non-critical edge with a logical color token.
+
+    Tokens (``"critical"``, ``"red"``, ``"orange"``, ``"green"``,
+    ``"edge"``) are written to ``data["color_token"]`` so that
+    downstream renderers can map them to concrete theme colors.
+    """
     for _, _, data in graph.out_edges(data=True):
         activity: Activity = data["activity"]
-        if not activity.critical:
-            if activity.total_float < low_float_threshold:
-                data["color"] = "red"
-            elif activity.total_float < medium_float_threshold:
-                data["color"] = "orange"
-            else:
-                data["color"] = "green"
+        if activity.critical:
+            data["color_token"] = "critical"
+        elif activity.total_float < low_float_threshold:
+            data["color_token"] = "red"
+        elif activity.total_float < medium_float_threshold:
+            data["color_token"] = "orange"
+        else:
+            data["color_token"] = "green"

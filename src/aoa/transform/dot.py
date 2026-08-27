@@ -1,4 +1,6 @@
 # typing: ignore
+from dataclasses import dataclass, field
+
 import networkx as nx
 import pygraphviz as pgvz
 
@@ -6,28 +8,40 @@ from aoa.model.activity import Activity
 from aoa.model.node import Node
 
 from .coloring_strategy import ColoringStrategyProtocol
+from .theme import DEFAULT_THEME_NAME, THEMES, Theme
 
 
-def create_dot(graph: nx.DiGraph, coloring_strategy: ColoringStrategyProtocol) -> pgvz.AGraph:
-    set_dot_attributes(graph, coloring_strategy)
+@dataclass
+class DotFormating:
+    critical: dict[str, str] = field(default_factory=lambda: {"color": "red", "penwidth": "5.0"})
+    medium_float: dict[str, str] = field(default_factory=lambda: {"color": "orange", "penwidth": "2.0"})
+    high_float: dict[str, str] = field(default_factory=lambda: {"color": "green", "penwidth": "2.0"})
+    dummy: dict[str, str] = field(default_factory=lambda: {"style": "dashed", "color": "black", "penwidth": "2.0"})
+
+
+def create_dot(
+    graph: nx.DiGraph,
+    coloring_strategy: ColoringStrategyProtocol,
+    theme: Theme = THEMES[DEFAULT_THEME_NAME],
+) -> pgvz.AGraph:
+    set_dot_attributes(graph, coloring_strategy, theme)
     gvz: pgvz.AGraph = nx.nx_agraph.to_agraph(graph)
-    # gvz.graph_attr["splines"] = "curved"
-    # gvz.graph_attr["splines"] = "polyline"
-    # gvz.graph_attr["splines"] = "ortho"
-    # gvz.graph_attr["splines"] = "spline"
-    # gvz.graph_attr["splines"] = "line"
     gvz = rank_dot_nodes(graph, gvz)
     gvz.graph_attr["rankdir"] = "TB"
     gvz.graph_attr["bgcolor"] = "transparent"
+    gvz.node_attr["style"] = "filled"
+    gvz.node_attr["fillcolor"] = theme.node_fill
+    gvz.node_attr["color"] = theme.node_stroke
+    gvz.node_attr["fontcolor"] = theme.text
+    gvz.edge_attr["color"] = theme.edge
+    gvz.edge_attr["fontcolor"] = theme.text_muted
     gvz.layout(prog="dot", args="-Nshape=Mrecord")
-    print(gvz)
     return gvz
 
 
 def rank_dot_nodes(graph: nx.DiGraph, gvz: pgvz.AGraph) -> pgvz.AGraph:
     rank_dict: dict[int, list[int]] = dict()
     for node_name in graph.nodes:
-        print(f"Processing node {node_name} for ranking...")
         node: Node = graph.nodes[node_name]["data"]
         rank_dict.setdefault(node.max_depth, []).append(node_name)
 
@@ -38,24 +52,35 @@ def rank_dot_nodes(graph: nx.DiGraph, gvz: pgvz.AGraph) -> pgvz.AGraph:
     return gvz
 
 
-def set_dot_attributes(graph: nx.DiGraph, coloring_strategy: ColoringStrategyProtocol):
-    set_edge_attributes(graph)
+def set_dot_attributes(
+    graph: nx.DiGraph,
+    coloring_strategy: ColoringStrategyProtocol,
+    theme: Theme,
+):
     coloring_strategy(graph)
+    set_edge_attributes(graph, theme)
 
 
-def set_edge_attributes(graph: nx.DiGraph) -> None:
-    # nx.set_edge_attributes(graph, values={}, name="label")
-    # nx.set_edge_attributes(graph, values={}, name="weight")
+def _token_to_color(token: str, theme: Theme) -> str:
+    return {
+        "critical": theme.critical,
+        "red": theme.red,
+        "orange": theme.orange,
+        "green": theme.green,
+        "edge": theme.edge,
+    }.get(token, theme.edge)
+
+
+def set_edge_attributes(graph: nx.DiGraph, theme: Theme) -> None:
     for e in graph.edges:
         edge = graph.edges[e]
         activity: Activity = edge["activity"]
         if activity.is_dummy:
             edge["style"] = "dashed"
+            edge["color"] = theme.edge
         else:
             edge["label"] = f"""[{activity.id}] {activity.activity}"""
-            edge[
-                "edgetooltip"
-            ] = f"""
+            edge["edgetooltip"] = f"""
 ES:{activity.earliest_start}
 D:{activity.duration}
 EF:{activity.earliest_finish}
@@ -66,7 +91,15 @@ LF:{activity.latest_finish}
 
             edge["decorate"] = "false"
 
+            token = edge.get("color_token")
+            if token:
+                edge["color"] = _token_to_color(token, theme)
+
         if activity.critical:
             edge["penwidth"] = "5.0"
+            edge["color"] = theme.critical
         else:
             edge["penwidth"] = "2.0"
+
+        penwidth = float(edge["penwidth"])
+        edge["arrowsize"] = f"{2.0 / penwidth:.3f}"

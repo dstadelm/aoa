@@ -22,6 +22,7 @@ from aoa.model.resources import Resource
 from aoa.model.state import State
 from aoa.transform.coloring_strategy import ColoringStrategies
 from aoa.transform.dot import create_dot
+from aoa.transform.theme import resolve_theme
 from aoa.transform.to_networkx import to_networkx
 
 app = Flask(__name__)
@@ -279,7 +280,8 @@ def post_network_dot():
         network = create_network(activity_collection)
         calculate_cpm(network)
         nx_graph = to_networkx(network)
-        agraph = create_dot(nx_graph, ColoringStrategies.exponential)
+        theme = resolve_theme(data.get("theme"))
+        agraph = create_dot(nx_graph, ColoringStrategies.exponential, theme=theme)
         svg_bytes = agraph.draw(format="svg", prog="dot")
         return app.response_class(svg_bytes, mimetype="image/svg+xml")
     except Exception as e:

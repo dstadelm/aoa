@@ -5,6 +5,8 @@ from aoa.model.cpm import calculate_cpm
 from aoa.model.network import create_network
 from aoa.transform.gantt import create_gantt
 from aoa.transform.plantuml import PlantUml
+from aoa.transform.coloring_strategy import ColoringStrategies
+from aoa.transform.theme import THEMES
 
 
 def test_simple_diamond_pert() -> None:
@@ -114,3 +116,58 @@ printscale weekly
 
 @endgantt"""
     )
+
+
+def _diamond_network():
+    activities = [
+        Activity(id=1, effort=5),
+        Activity(id=2, effort=3, predecessors=set([1])),
+        Activity(id=3, effort=5),
+        Activity(id=4, effort=5, predecessors=set([3])),
+    ]
+    network = create_network(ActivityCollection(activities))
+    calculate_cpm(network)
+    return network
+
+
+def test_themed_pert_contains_skinparams() -> None:
+    theme = THEMES["tokyonight"]
+    network = _diamond_network()
+    result = PlantUml(network, theme=theme).get_txt()
+    assert "skinparam backgroundColor transparent" in result
+    assert f"skinparam ArrowColor {theme.edge}" in result
+    assert f"skinparam defaultFontColor {theme.text}" in result
+    assert f"BackgroundColor {theme.node_fill}" in result
+
+
+def test_themed_pert_colors_critical_arrows() -> None:
+    theme = THEMES["tokyonight"]
+    network = _diamond_network()
+    result = PlantUml(network, theme=theme).get_txt()
+    critical_hex = theme.critical.lstrip("#")
+    # Critical activities on the CP should be styled with the theme's critical color.
+    assert f"[#{critical_hex},thickness=4]" in result
+
+
+def test_themed_pert_colors_non_critical_arrows_via_strategy() -> None:
+    theme = THEMES["tokyonight"]
+    network = _diamond_network()
+    result = PlantUml(
+        network,
+        theme=theme,
+        coloring_strategy=ColoringStrategies.exponential,
+    ).get_txt()
+    # At least one non-critical activity must carry a themed color that is
+    # NOT the critical color (activities 1 and 2 have positive float).
+    for color in (theme.red, theme.orange, theme.green):
+        if f"[#{color.lstrip('#')}]" in result:
+            return
+    raise AssertionError("expected at least one themed non-critical arrow color")
+
+
+def test_untinted_pert_matches_legacy_output() -> None:
+    """Without a theme, output must be identical to the legacy format."""
+    network = _diamond_network()
+    result = PlantUml(network).get_txt()
+    assert "skinparam" not in result
+    assert "0 -[thickness=4]-> 2" in result

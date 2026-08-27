@@ -109,7 +109,7 @@ btnCompute.addEventListener("click", async () => {
   try {
     const renderer = optRenderer.value;
     if (renderer === "graphviz") {
-      dotSvg = await computeNetworkDot(project.activities);
+      dotSvg = await computeNetworkDot(project.activities, themeSelect.value);
       graphData = null;
       renderDotSvg();
     } else {
@@ -167,7 +167,7 @@ optRenderer.addEventListener("change", async () => {
       renderDotSvg();
     } else if (project.activities.length) {
       try {
-        dotSvg = await computeNetworkDot(project.activities);
+        dotSvg = await computeNetworkDot(project.activities, themeSelect.value);
         renderDotSvg();
       } catch (e: any) {
         showStatus(`Compute failed: ${e.message}`, true);
@@ -221,11 +221,20 @@ const themeSelect = document.getElementById("theme-select") as HTMLSelectElement
 const savedTheme = localStorage.getItem("aoa-theme") || "material-light";
 document.documentElement.setAttribute("data-theme", savedTheme);
 themeSelect.value = savedTheme;
-themeSelect.addEventListener("change", () => {
+themeSelect.addEventListener("change", async () => {
   const theme = themeSelect.value;
   document.documentElement.setAttribute("data-theme", theme);
   localStorage.setItem("aoa-theme", theme);
-  redrawGraph();
+  if (optRenderer.value === "graphviz" && project.activities.length) {
+    try {
+      dotSvg = await computeNetworkDot(project.activities, theme);
+      renderDotSvg();
+    } catch (e: any) {
+      showStatus(`Compute failed: ${e.message}`, true);
+    }
+  } else {
+    redrawGraph();
+  }
 });
 
 renderCurrentTable();
