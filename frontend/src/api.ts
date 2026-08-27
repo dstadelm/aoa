@@ -30,11 +30,11 @@ export async function computeNetwork(activities: ActivityData[]): Promise<GraphD
   return data;
 }
 
-export async function computeNetworkDot(activities: ActivityData[], theme?: string): Promise<string> {
+export async function computeNetworkDot(activities: ActivityData[], theme?: string, rankdir?: string): Promise<string> {
   const res = await fetch(`${API_BASE}/network/dot`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ activities, theme }),
+    body: JSON.stringify({ activities, theme, rankdir }),
   });
   if (!res.ok) {
     const data = await res.json();

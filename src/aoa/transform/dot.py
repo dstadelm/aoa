@@ -23,11 +23,12 @@ def create_dot(
     graph: nx.DiGraph,
     coloring_strategy: ColoringStrategyProtocol,
     theme: Theme = THEMES[DEFAULT_THEME_NAME],
+    rankdir: str = "TB",
 ) -> pgvz.AGraph:
     set_dot_attributes(graph, coloring_strategy, theme)
     gvz: pgvz.AGraph = nx.nx_agraph.to_agraph(graph)
     gvz = rank_dot_nodes(graph, gvz)
-    gvz.graph_attr["rankdir"] = "TB"
+    gvz.graph_attr["rankdir"] = rankdir
     gvz.graph_attr["bgcolor"] = "transparent"
     gvz.node_attr["style"] = "filled"
     gvz.node_attr["fillcolor"] = theme.node_fill

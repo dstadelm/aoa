@@ -281,7 +281,10 @@ def post_network_dot():
         calculate_cpm(network)
         nx_graph = to_networkx(network)
         theme = resolve_theme(data.get("theme"))
-        agraph = create_dot(nx_graph, ColoringStrategies.exponential, theme=theme)
+        rankdir = data.get("rankdir", "TB")
+        if rankdir not in ("TB", "BT", "LR", "RL"):
+            rankdir = "TB"
+        agraph = create_dot(nx_graph, ColoringStrategies.exponential, theme=theme, rankdir=rankdir)
         svg_bytes = agraph.draw(format="svg", prog="dot")
         return app.response_class(svg_bytes, mimetype="image/svg+xml")
     except Exception as e:

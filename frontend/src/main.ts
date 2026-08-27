@@ -109,7 +109,7 @@ btnCompute.addEventListener("click", async () => {
   try {
     const renderer = optRenderer.value;
     if (renderer === "graphviz") {
-      dotSvg = await computeNetworkDot(project.activities, themeSelect.value);
+      dotSvg = await computeNetworkDot(project.activities, themeSelect.value, optRankdir.value);
       graphData = null;
       renderDotSvg();
     } else {
@@ -167,7 +167,7 @@ optRenderer.addEventListener("change", async () => {
       renderDotSvg();
     } else if (project.activities.length) {
       try {
-        dotSvg = await computeNetworkDot(project.activities, themeSelect.value);
+        dotSvg = await computeNetworkDot(project.activities, themeSelect.value, optRankdir.value);
         renderDotSvg();
       } catch (e: any) {
         showStatus(`Compute failed: ${e.message}`, true);
@@ -188,7 +188,20 @@ optRenderer.addEventListener("change", async () => {
 });
 
 [optRanker, optRankdir, optAlign].forEach((sel) => {
-  sel.addEventListener("change", redrawGraph);
+  sel.addEventListener("change", async () => {
+    if (optRenderer.value === "graphviz") {
+      if (sel === optRankdir && project.activities.length) {
+        try {
+          dotSvg = await computeNetworkDot(project.activities, themeSelect.value, optRankdir.value);
+          renderDotSvg();
+        } catch (e: any) {
+          showStatus(`Compute failed: ${e.message}`, true);
+        }
+      }
+    } else {
+      redrawGraph();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -227,7 +240,7 @@ themeSelect.addEventListener("change", async () => {
   localStorage.setItem("aoa-theme", theme);
   if (optRenderer.value === "graphviz" && project.activities.length) {
     try {
-      dotSvg = await computeNetworkDot(project.activities, theme);
+      dotSvg = await computeNetworkDot(project.activities, theme, optRankdir.value);
       renderDotSvg();
     } catch (e: any) {
       showStatus(`Compute failed: ${e.message}`, true);
