@@ -1,11 +1,46 @@
-Activities:
-  - {Id: 1, Activity: A, Effort: 5}
-  - {Id: 2, Activity: B, Effort: 5}
-  - {Id: 3, Activity: C, Effort: 5}
-  - {Id: 4, Activity: D, Effort: 5}
-  - {Id: 5, Predecessors: [1], Activity: E, Effort: 5}
-  - {Id: 6, Predecessors: [2], Activity: F, Effort: 5}
-  - {Id: 7, Predecessors: [3], Activity: G, Effort: 5}
-  - {Id: 8, Predecessors: [4], Activity: H, Effort: 5}
-  - {Id: 9, Predecessors: [5], Activity: I, Effort: 5}
-  - {Id: 10, Predecessors: [5, 6, 7, 8], Activity: I, Effort: 5}
+activities:
+- id: 1
+  activity: A
+  effort: 5.0
+- id: 2
+  activity: B
+  effort: 5.0
+- id: 3
+  activity: C
+  effort: 5.0
+- id: 4
+  activity: D
+  effort: 5.0
+- id: 5
+  activity: E
+  predecessors:
+  - 1
+  effort: 5.0
+- id: 6
+  activity: F
+  predecessors:
+  - 2
+  effort: 5.0
+- id: 7
+  activity: G
+  predecessors:
+  - 3
+  effort: 5.0
+- id: 8
+  activity: H
+  predecessors:
+  - 4
+  effort: 5.0
+- id: 9
+  activity: I
+  predecessors:
+  - 5
+  effort: 5.0
+- id: 10
+  activity: I
+  predecessors:
+  - 5
+  - 6
+  - 7
+  - 8
+  effort: 5.0

@@ -1,7 +1,41 @@
-Activities:
-  - {Id: 1, Activity: A, Effort: 5, Owner: zf, Ressource: dummy}
-  - {Id: 2, Activity: B, Effort: 5, Owner: unknown, Ressource: dummy}
-  - {Id: 3, Activity: C, Effort: 5, Owner: scs, Ressource: dummy}
-  - {Id: 4, Predecessors: [1, 2, 3], Activity: D, Effort: 5, Owner: zf, Ressource: dummy}
-  - {Id: 5, Predecessors: [2, 3], Activity: E, Effort: 5, Owner: zf, Ressource: dummy}
-  - {Id: 6, Predecessors: [1, 2], Activity: F, Effort: 5, Owner: dc, Ressource: dummy}
+activities:
+- id: 1
+  activity: A
+  effort: 5.0
+  owner: zf
+  resource: dummy
+- id: 2
+  activity: B
+  effort: 5.0
+  owner: unknown
+  resource: dummy
+- id: 3
+  activity: C
+  effort: 5.0
+  owner: scs
+  resource: dummy
+- id: 4
+  activity: D
+  predecessors:
+  - 1
+  - 2
+  - 3
+  effort: 5.0
+  owner: zf
+  resource: dummy
+- id: 5
+  activity: E
+  predecessors:
+  - 2
+  - 3
+  effort: 5.0
+  owner: zf
+  resource: dummy
+- id: 6
+  activity: F
+  predecessors:
+  - 1
+  - 2
+  effort: 5.0
+  owner: dc
+  resource: dummy
