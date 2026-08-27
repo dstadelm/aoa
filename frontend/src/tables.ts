@@ -2,7 +2,7 @@
  * Editable HTML tables for resources, milestones, and activities.
  */
 
-import type { ActivityData, ResourceData, MilestoneData } from "./types";
+import type { ActivityData, ResourceData, MilestoneData, ProjectData } from "./types";
 import { STATES } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -43,6 +43,30 @@ function deleteCell(onClick: () => void): HTMLTableCellElement {
   btn.addEventListener("click", onClick);
   td.appendChild(btn);
   return td;
+}
+
+// ---------------------------------------------------------------------------
+// Project form (start date, etc.)
+// ---------------------------------------------------------------------------
+
+export function renderProjectForm(
+  container: HTMLElement,
+  project: ProjectData,
+  onUpdate: () => void,
+): void {
+  container.innerHTML = "";
+  const form = el("div", { class: "project-form" });
+
+  const label = el("label", {}, "Start Date: ");
+  const input = el("input", { type: "date", value: project.start || "" });
+  input.addEventListener("change", () => {
+    project.start = input.value;
+    onUpdate();
+  });
+  label.appendChild(input);
+  form.appendChild(label);
+
+  container.appendChild(form);
 }
 
 // ---------------------------------------------------------------------------

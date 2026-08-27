@@ -1,6 +1,6 @@
 import { loadProject, saveProject, computeNetwork, computeNetworkDot } from "./api";
 import { initTabs, type TabName } from "./tabs";
-import { renderActivitiesTable, renderResourcesTable, renderMilestonesTable } from "./tables";
+import { renderActivitiesTable, renderResourcesTable, renderMilestonesTable, renderProjectForm } from "./tables";
 import { renderGraph, type LayoutOptions } from "./graph";
 import type { ProjectData, GraphData } from "./types";
 
@@ -58,6 +58,9 @@ function renderCurrentTable(): void {
       break;
     case "milestones":
       renderMilestonesTable(tableContainer, project.milestones, () => {});
+      break;
+    case "project":
+      renderProjectForm(tableContainer, project, () => {});
       break;
   }
 }

@@ -2,7 +2,7 @@
  * Tab switching logic for the top section.
  */
 
-export type TabName = "resources" | "milestones" | "activities";
+export type TabName = "project" | "resources" | "milestones" | "activities";
 
 export function initTabs(onSwitch: (tab: TabName) => void): void {
   const buttons = document.querySelectorAll<HTMLButtonElement>(".tab-btn");
