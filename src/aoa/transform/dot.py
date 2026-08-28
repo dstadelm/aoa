@@ -31,12 +31,13 @@ def create_dot(
     gvz.graph_attr["rankdir"] = rankdir
     gvz.graph_attr["bgcolor"] = "transparent"
     gvz.node_attr["style"] = "filled"
+    gvz.node_attr["shape"] = "circle"
     gvz.node_attr["fillcolor"] = theme.node_fill
     gvz.node_attr["color"] = theme.node_stroke
     gvz.node_attr["fontcolor"] = theme.text
     gvz.edge_attr["color"] = theme.edge
     gvz.edge_attr["fontcolor"] = theme.text_muted
-    gvz.layout(prog="dot", args="-Nshape=Mrecord")
+    gvz.layout(prog="dot")
     return gvz
 
 

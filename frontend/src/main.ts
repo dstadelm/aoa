@@ -32,6 +32,41 @@ const btnCompute = document.getElementById("btn-compute")!;
 const tableContainer = document.getElementById("table-container")!;
 const graphContainer = document.getElementById("graph-container")!;
 const statusMsg = document.getElementById("status-msg")!;
+const btnExportSvg = document.getElementById("btn-export-svg")!;
+
+btnExportSvg.addEventListener("click", () => {
+  const svg = graphContainer.querySelector("svg");
+  if (!svg) {
+    showStatus("Nothing to export — compute the diagram first.", true);
+    return;
+  }
+  // Clone so we don't mutate the live DOM
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+
+  // Ensure explicit width/height on the exported SVG
+  const bbox = svg.getBoundingClientRect();
+  if (!clone.getAttribute("viewBox")) {
+    clone.setAttribute("viewBox", `0 0 ${bbox.width} ${bbox.height}`);
+  }
+  clone.setAttribute("width", String(Math.round(bbox.width)));
+  clone.setAttribute("height", String(Math.round(bbox.height)));
+
+  const source = new XMLSerializer().serializeToString(clone);
+  const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n', source], {
+    type: "image/svg+xml;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `aoa-diagram-${optRenderer.value}-${Date.now()}.svg`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showStatus("SVG exported.");
+});
 
 // ---------------------------------------------------------------------------
 // Status message helper
