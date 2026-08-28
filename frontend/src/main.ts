@@ -33,39 +33,135 @@ const tableContainer = document.getElementById("table-container")!;
 const graphContainer = document.getElementById("graph-container")!;
 const statusMsg = document.getElementById("status-msg")!;
 const btnExportSvg = document.getElementById("btn-export-svg")!;
+const btnExportPng = document.getElementById("btn-export-png")!;
 
-btnExportSvg.addEventListener("click", () => {
+// Whitelist of CSS properties to inline so exported SVGs render standalone.
+const SVG_STYLE_PROPS = [
+  "fill",
+  "fill-opacity",
+  "stroke",
+  "stroke-width",
+  "stroke-opacity",
+  "stroke-dasharray",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "opacity",
+  "font-family",
+  "font-size",
+  "font-weight",
+  "font-style",
+  "text-anchor",
+  "dominant-baseline",
+  "visibility",
+  "display",
+];
+
+function inlineStyles(source: SVGSVGElement, target: SVGSVGElement): void {
+  const srcNodes = source.querySelectorAll<SVGElement>("*");
+  const dstNodes = target.querySelectorAll<SVGElement>("*");
+  // Also handle the root svg itself
+  const inlineFor = (src: Element, dst: Element) => {
+    const cs = window.getComputedStyle(src);
+    let styleStr = "";
+    for (const prop of SVG_STYLE_PROPS) {
+      const val = cs.getPropertyValue(prop);
+      if (val && val !== "none" && val !== "normal") {
+        styleStr += `${prop}:${val};`;
+      }
+    }
+    if (styleStr) (dst as SVGElement).setAttribute("style", styleStr);
+  };
+  inlineFor(source, target);
+  srcNodes.forEach((src, i) => inlineFor(src, dstNodes[i]));
+}
+
+function buildStandaloneSvg(): { clone: SVGSVGElement; width: number; height: number } | null {
   const svg = graphContainer.querySelector("svg");
-  if (!svg) {
-    showStatus("Nothing to export — compute the diagram first.", true);
-    return;
-  }
-  // Clone so we don't mutate the live DOM
+  if (!svg) return null;
   const clone = svg.cloneNode(true) as SVGSVGElement;
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+  inlineStyles(svg, clone);
 
-  // Ensure explicit width/height on the exported SVG
   const bbox = svg.getBoundingClientRect();
   if (!clone.getAttribute("viewBox")) {
     clone.setAttribute("viewBox", `0 0 ${bbox.width} ${bbox.height}`);
   }
-  clone.setAttribute("width", String(Math.round(bbox.width)));
-  clone.setAttribute("height", String(Math.round(bbox.height)));
+  const width = Math.round(bbox.width);
+  const height = Math.round(bbox.height);
+  clone.setAttribute("width", String(width));
+  clone.setAttribute("height", String(height));
 
-  const source = new XMLSerializer().serializeToString(clone);
-  const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n', source], {
-    type: "image/svg+xml;charset=utf-8",
-  });
+  // Add a background rect matching the current theme so PNGs aren't transparent.
+  const bg = window.getComputedStyle(graphContainer).backgroundColor;
+  if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") {
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("width", "100%");
+    rect.setAttribute("height", "100%");
+    rect.setAttribute("fill", bg);
+    clone.insertBefore(rect, clone.firstChild);
+  }
+  return { clone, width, height };
+}
+
+function triggerDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `aoa-diagram-${optRenderer.value}-${Date.now()}.svg`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+btnExportSvg.addEventListener("click", () => {
+  const built = buildStandaloneSvg();
+  if (!built) {
+    showStatus("Nothing to export — compute the diagram first.", true);
+    return;
+  }
+  const source = new XMLSerializer().serializeToString(built.clone);
+  const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n', source], {
+    type: "image/svg+xml;charset=utf-8",
+  });
+  triggerDownload(blob, `aoa-diagram-${optRenderer.value}-${Date.now()}.svg`);
   showStatus("SVG exported.");
+});
+
+btnExportPng.addEventListener("click", () => {
+  const built = buildStandaloneSvg();
+  if (!built) {
+    showStatus("Nothing to export — compute the diagram first.", true);
+    return;
+  }
+  const source = new XMLSerializer().serializeToString(built.clone);
+  const svgBlob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+  const scale = 2; // hi-DPI
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = built.width * scale;
+    canvas.height = built.height * scale;
+    const ctx = canvas.getContext("2d")!;
+    ctx.scale(scale, scale);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        showStatus("PNG conversion failed.", true);
+        return;
+      }
+      triggerDownload(blob, `aoa-diagram-${optRenderer.value}-${Date.now()}.png`);
+      showStatus("PNG exported.");
+    }, "image/png");
+  };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    showStatus("PNG export failed to load SVG.", true);
+  };
+  img.src = url;
 });
 
 // ---------------------------------------------------------------------------

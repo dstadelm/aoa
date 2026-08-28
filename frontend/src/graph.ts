@@ -6,8 +6,8 @@ import * as d3 from "d3";
 import dagre from "@dagrejs/dagre";
 import type { GraphData, GraphEdge } from "./types";
 
-const NODE_WIDTH = 80;
-const NODE_HEIGHT = 50;
+const NODE_RADIUS = 20;
+const NODE_SIZE = NODE_RADIUS * 2;
 const ARROW_ID = "arrowhead";
 
 export interface LayoutOptions {
@@ -67,7 +67,7 @@ export function renderGraph(container: HTMLElement, data: GraphData, options?: L
   g.setDefaultEdgeLabel(() => ({}));
 
   data.nodes.forEach((n) => {
-    g.setNode(String(n.id), { label: String(n.id), width: NODE_WIDTH, height: NODE_HEIGHT });
+    g.setNode(String(n.id), { label: String(n.id), width: NODE_SIZE, height: NODE_SIZE });
   });
 
   data.edges.forEach((e, i) => {
@@ -180,32 +180,13 @@ export function renderGraph(container: HTMLElement, data: GraphData, options?: L
 
     const ng = nodeGroup
       .append("g")
-      .attr("transform", `translate(${nodeData.x - NODE_WIDTH / 2}, ${nodeData.y - NODE_HEIGHT / 2})`);
+      .attr("transform", `translate(${nodeData.x}, ${nodeData.y})`);
 
-    ng.append("rect")
-      .attr("width", NODE_WIDTH)
-      .attr("height", NODE_HEIGHT)
-      .attr("rx", 8)
-      .attr("ry", 8)
+    ng.append("circle")
+      .attr("r", NODE_RADIUS)
       .attr("class", "node-rect");
 
-    ng.append("text")
-      .attr("x", NODE_WIDTH / 2)
-      .attr("y", NODE_HEIGHT / 2 - 6)
-      .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "middle")
-      .attr("class", "node-label")
-      .text(nodeId);
-
     if (graphNode) {
-      ng.append("text")
-        .attr("x", NODE_WIDTH / 2)
-        .attr("y", NODE_HEIGHT / 2 + 10)
-        .attr("text-anchor", "middle")
-        .attr("dominant-baseline", "middle")
-        .attr("class", "node-sublabel")
-        .text(`ES:${graphNode.earliestStart} LS:${graphNode.latestStart}`);
-
       ng.append("title").text(
         `Node ${nodeId}\nES: ${graphNode.earliestStart}\nLS: ${graphNode.latestStart}\nDepth: ${graphNode.maxDepth}`
       );

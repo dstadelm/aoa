@@ -32,6 +32,7 @@ def create_dot(
     gvz.graph_attr["bgcolor"] = "transparent"
     gvz.node_attr["style"] = "filled"
     gvz.node_attr["shape"] = "circle"
+    gvz.node_attr["label"] = ""
     gvz.node_attr["fillcolor"] = theme.node_fill
     gvz.node_attr["color"] = theme.node_stroke
     gvz.node_attr["fontcolor"] = theme.text

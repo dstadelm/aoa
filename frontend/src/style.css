@@ -210,10 +210,38 @@
   --graph-arrow: #c0caf5;
 }
 
+/* ---- Frappe Gantt theme remap ----
+   Higher specificity than :root so we win against frappe-gantt.css,
+   which is imported after our stylesheet via Vite. */
+html[data-theme] {
+  --g-arrow-color: var(--graph-arrow);
+  --g-bar-color: var(--primary);
+  --g-bar-border: var(--border);
+  --g-tick-color: var(--surface-alt);
+  --g-tick-color-thick: var(--border);
+  --g-actions-background: var(--surface-alt);
+  --g-border-color: var(--border);
+  --g-text-muted: var(--text-muted);
+  --g-text-light: #ffffff;
+  --g-text-dark: var(--text);
+  --g-progress-color: var(--primary-hover);
+  --g-handle-color: var(--primary);
+  --g-weekend-label-color: var(--border);
+  --g-expected-progress: var(--graph-orange);
+  --g-header-background: var(--surface);
+  --g-row-color: var(--surface);
+  --g-row-border-color: var(--border);
+  --g-today-highlight: var(--primary);
+  --g-popup-actions: var(--surface-alt);
+  --g-weekend-highlight-color: var(--graph-weekend);
+}
+
 /* Non-theme constants */
 :root {
   --radius: 6px;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  /* Derived: subtle tint of the arrow/text color for weekend columns. */
+  --graph-weekend: color-mix(in srgb, var(--graph-arrow) 8%, transparent);
 }
 
 /* Fallback when no data-theme is set */
@@ -604,4 +632,33 @@ main {
 .dot-svg-container svg {
   max-width: 100%;
   height: auto;
+}
+
+/* ---- Frappe Gantt overrides ---- */
+
+.frappe-gantt-wrapper {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.gantt .bar-critical .bar {
+  fill: var(--graph-critical);
+}
+
+.gantt .bar-critical .bar-progress {
+  fill: var(--graph-critical);
+  filter: brightness(0.85);
+}
+
+.gantt .bar-milestone .bar {
+  fill: var(--graph-orange);
+  stroke: var(--node-stroke);
+  stroke-width: 1;
+}
+
+.gantt .bar-milestone .bar-label,
+.gantt .bar-critical .bar-label {
+  fill: #ffffff;
+  font-weight: 600;
 }
