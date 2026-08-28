@@ -94,80 +94,101 @@ class ActivityCollection(dict[int, Activity]):
 def check_for_overconstraining(activities: ActivityCollection) -> None:
     """Check that no overconstraining exists in the provided activities.
 
-    Overconstraining exists when an activity is a direct predecessor of another activity but also a downstream predecessor of the same activity.
+    Overconstraining exists when an activity has a direct predecessor that is also transitively reachable via
+    another of its predecessors. Assumes the graph is acyclic (call ``check_no_cycles_exist`` first).
 
     Arguments:
-        activities (list[Activity]): The list of activities to check
+        activities (ActivityCollection): The activities to check
     """
-    downstream_predecessor_lut: dict[int, set[int]] = dict()
+    transitive: dict[int, set[int]] = {}
+
+    def ancestors(aid: int) -> set[int]:
+        if aid in transitive:
+            return transitive[aid]
+        acc: set[int] = set()
+        for p in activities[aid].predecessors:
+            acc.add(p)
+            acc |= ancestors(p)
+        transitive[aid] = acc
+        return acc
 
     for activity in activities.values():
-        # update downstream predecessors
-        for predecessor_id in activity.predecessors:
-
-            downstream_predecessor_lut.setdefault(predecessor_id, set()).update(activities[predecessor_id].predecessors)
-            downstream_predecessor_lut.setdefault(predecessor_id, set()).update(
-                downstream_predecessor_lut.get(predecessor_id, set())
-            )
-        intersection = downstream_predecessor_lut.get(activity.id, set()).intersection(activity.predecessors)
-        if intersection:
-            raise AllocationException(
-                f"Downstream activities {intersection} detected as direct predecessors of activity {activity.id}"
-            )
+        for direct_pred in activity.predecessors:
+            indirect = ancestors(direct_pred)
+            redundant = indirect & activity.predecessors
+            if redundant:
+                raise AllocationException(
+                    f"Downstream activities {redundant} detected as direct predecessors of activity {activity.id}"
+                )
 
 
 def check_no_cycles_exist(activities: ActivityCollection) -> None:
     """Check that no cycles exist in the provided activities.
 
-    A cycle exists when an activity is both a predecessor and a downstream predecessor of another activity.
+    Performs an iterative DFS using two sets:
+      * ``visited`` — nodes fully explored; revisiting them is fine (diamond DAGs).
+      * ``on_stack`` — nodes on the current DFS path; revisiting one indicates a cycle.
+
+    When a back-edge is detected, the exact cycle path is extracted from the DFS stack for reporting.
 
     Arguments:
-        activities (list[Activity]): The list of activities to check
+        activities (ActivityCollection): The activities to check
     """
-    for activity in activities.values():
-        visited: set[int] = set()
+    visited: set[int] = set()
 
-        def visit(act: Activity) -> None:
-            if act.id in visited:
-                pruned = prune_involved(visited, activities)
-                message = ", ".join([f"ID[{id}]" for id in pruned])
+    for root in activities.values():
+        if root.id in visited:
+            continue
+
+        # Stack entries: (activity_id, iterator over its predecessors)
+        stack: list[tuple[int, "iter"]] = [(root.id, iter(activities[root.id].predecessors))]
+        on_stack: set[int] = {root.id}
+        path: list[int] = [root.id]
+
+        while stack:
+            current_id, pred_iter = stack[-1]
+            try:
+                pred_id = next(pred_iter)
+            except StopIteration:
+                stack.pop()
+                on_stack.discard(current_id)
+                path.pop()
+                visited.add(current_id)
+                continue
+
+            if pred_id in on_stack:
+                # Found a back-edge: cycle is path[path.index(pred_id):] + [pred_id]
+                start_idx = path.index(pred_id)
+                cycle_ids = sorted(path[start_idx:])
+                message = ", ".join(f"ID[{aid}]" for aid in cycle_ids)
                 raise AllocationException(f"Cycle detected in the network involving activities {message}")
-            visited.add(act.id)
-            for pred_id in act.predecessors:
-                visit(activities[pred_id])
 
-        visit(activity)
+            if pred_id in visited:
+                continue
+
+            stack.append((pred_id, iter(activities[pred_id].predecessors)))
+            on_stack.add(pred_id)
+            path.append(pred_id)
 
 
 def prune_involved(involved: set[int], activities: ActivityCollection) -> set[int]:
-    """Prune the involved set by removing activities that have no predecessors recursively.
+    """Prune the involved set by iteratively removing activities whose predecessors are all outside the set.
 
-    Given activities A, B, C, D and E where A has no predecessors, B has A as predecessor C has B and E as
-    predecessor, D has C as predecessor and E has D as predecessor. The involved set is {A, B, C, D, E}. Pruning
-    this set will remove A first as it has no predecessors resulting in the set {B, C, D, E}. B will then be
-    modified to by removing A as predecessor resulting in B having no predecessors. Pruning will then remove B
-    resulting in the set {C, D, E}. B will be removed from C but C will still have E as predecessor so it won't be
-    removed. The final pruned set will be {C, D, E}.
+    Only activities whose remaining predecessors are all within `involved` can participate in a cycle among
+    `involved`. Anything else is trimmed. Iterates until stable. Does not mutate the underlying activities.
 
     Arguments:
         involved (set[int]): The set of involved activity ids
-        activity_dict (dict[int, Activity]): The dictionary of activities by id
+        activities (ActivityCollection): Lookup for activities by id
     Returns:
         set[int]: The pruned set of involved activity ids
-
     """
-    pruned = involved.copy()
-    for act_id in involved:
-        activity = activities[act_id]
-        if not activity.predecessors:
-            pruned.discard(act_id)
-            for activity in activities.values():
-                activity.predecessors.discard(act_id)
-
-    if pruned != involved:
-        return prune_involved(pruned, activities)
-    else:
-        return pruned
+    pruned = set(involved)
+    while True:
+        removable = {a for a in pruned if not (activities[a].predecessors & pruned)}
+        if not removable:
+            return pruned
+        pruned -= removable
 
 
 def check_for_unique_ids(activities: list[Activity]) -> None:
