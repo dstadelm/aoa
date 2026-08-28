@@ -82,7 +82,7 @@ export function renderActivitiesTable(
   const table = el("table", { class: "data-table" });
   const thead = el("thead");
   const headerRow = el("tr");
-  ["ID", "Activity", "Predecessors", "Planned Effort", "Owner", "Resource", "State", ""].forEach((h) =>
+  ["ID", "Activity", "Predecessors", "Planned Effort", "Actual Effort", "Owner", "Resource", "State", ""].forEach((h) =>
     headerRow.appendChild(el("th", {}, h))
   );
   thead.appendChild(headerRow);
@@ -98,6 +98,7 @@ export function renderActivitiesTable(
       onUpdate();
     }));
     tr.appendChild(editableCell(String(a.planned_effort), (v) => { a.planned_effort = parseFloat(v) || 0; onUpdate(); }));
+    tr.appendChild(editableCell(String(a.actual_effort), (v) => { a.actual_effort = parseFloat(v) || 0; onUpdate(); }));
     tr.appendChild(editableCell(a.owner, (v) => { a.owner = v; onUpdate(); }));
     tr.appendChild(editableCell(a.resource, (v) => { a.resource = v; onUpdate(); }));
     tr.appendChild(selectCell(a.state, STATES, (v) => { a.state = v; onUpdate(); }));
@@ -110,7 +111,7 @@ export function renderActivitiesTable(
   const addBtn = el("button", { class: "add-btn" }, "+ Add Activity");
   addBtn.addEventListener("click", () => {
     const maxId = activities.reduce((m, a) => Math.max(m, a.id), 0);
-    activities.push({ id: maxId + 1, activity: "", predecessors: [], planned_effort: 0, owner: "", resource: "", state: "OPEN" });
+    activities.push({ id: maxId + 1, activity: "", predecessors: [], planned_effort: 0, actual_effort: 0, owner: "", resource: "", state: "OPEN" });
     renderActivitiesTable(container, activities, onUpdate);
     onUpdate();
   });

@@ -5,6 +5,7 @@ export interface ActivityData {
   activity: string;
   predecessors: number[];
   planned_effort: number;
+  actual_effort: number;
   owner: string;
   resource: string;
   state: string;

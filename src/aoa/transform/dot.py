@@ -82,8 +82,8 @@ def set_edge_attributes(graph: nx.DiGraph, theme: Theme) -> None:
             edge["style"] = "dashed"
             edge["color"] = theme.edge
         else:
-            edge["label"] = f"""[{activity.id}] {activity.activity}"""
-            edge["edgetooltip"] = f"""
+            edge["label"] = activity.activity
+            edge["edgetooltip"] = f"""[{activity.id}] {activity.activity}
 ES:{activity.earliest_start}
 D:{activity.duration}
 EF:{activity.earliest_finish}

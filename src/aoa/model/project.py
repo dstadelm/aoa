@@ -114,6 +114,7 @@ def _serialize_project(project: Project) -> ProjectDictType:
                     "activity": a.activity,
                     "predecessors": sorted(a.predecessors) if a.predecessors else None,
                     "planned_effort": a.planned_effort if a.planned_effort else None,
+                    "actual_effort": a.actual_effort if a.actual_effort else None,
                     "owner": a.owner,
                     "resource": a.resource,
                     "state": a.state.name if a.state != State.OPEN else None,

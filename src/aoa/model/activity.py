@@ -27,6 +27,7 @@ class ActivityProtocol:
 class Activity:
     id: int
     planned_effort: float = field(default=0.0, eq=False)
+    actual_effort: float = field(default=0.0, eq=False)
     resource: str = field(default="", eq=False)
     owner: str = field(default="", eq=False)
     activity: str = field(default="", eq=False)
