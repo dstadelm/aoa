@@ -85,7 +85,7 @@ def set_edge_attributes(graph: nx.DiGraph, theme: Theme) -> None:
             edge["label"] = activity.activity
             edge["edgetooltip"] = f"""[{activity.id}] {activity.activity}
 ES:{activity.earliest_start}
-D:{activity.duration}
+D:{activity.planned_effort}
 EF:{activity.earliest_finish}
 LS:{activity.latest_start}
 TF:{activity.total_float}

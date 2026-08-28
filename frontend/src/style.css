@@ -662,3 +662,16 @@ main {
   fill: #ffffff;
   font-weight: 600;
 }
+
+/* Default (inside-bar) label: readable on the default bar fill */
+.gantt .bar-label {
+  fill: #ffffff;
+  font-weight: 600;
+}
+
+/* When the bar is too narrow, Frappe adds .big and places the label
+   outside the bar. Use the theme text color so it stays legible. */
+.gantt .bar-label.big {
+  fill: var(--text);
+  font-weight: 500;
+}

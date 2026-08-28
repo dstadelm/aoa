@@ -20,11 +20,11 @@ export async function saveProject(filePath: string, project: ProjectData): Promi
   if (data.error) throw new Error(data.error);
 }
 
-export async function computeNetwork(activities: ActivityData[]): Promise<GraphData> {
+export async function computeNetwork(activities: ActivityData[], resources: any[] = []): Promise<GraphData> {
   const res = await fetch(`${API_BASE}/network`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ activities }),
+    body: JSON.stringify({ activities, resources }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
@@ -35,22 +35,23 @@ export async function computeNetworkGantt(
   activities: ActivityData[],
   milestones: any[],
   start: string,
+  resources: any[] = [],
 ): Promise<GanttData> {
   const res = await fetch(`${API_BASE}/network/gantt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ activities, milestones, start }),
+    body: JSON.stringify({ activities, milestones, start, resources }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return data;
 }
 
-export async function computeNetworkDot(activities: ActivityData[], theme?: string, rankdir?: string): Promise<string> {
+export async function computeNetworkDot(activities: ActivityData[], theme?: string, rankdir?: string, resources: any[] = []): Promise<string> {
   const res = await fetch(`${API_BASE}/network/dot`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ activities, theme, rankdir }),
+    body: JSON.stringify({ activities, theme, rankdir, resources }),
   });
   if (!res.ok) {
     const data = await res.json();

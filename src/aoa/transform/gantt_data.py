@@ -7,7 +7,9 @@ from datetime import date, timedelta
 from math import ceil
 
 from aoa.model.activity import Activity
+from aoa.model.duration import duration as compute_duration
 from aoa.model.milestones import Milestone
+from aoa.model.resources import ResourceCollection
 
 
 def add_working_days(start: date, days: int) -> date:
@@ -33,14 +35,17 @@ def build_gantt_data(
     activities: list[Activity],
     milestones: list[Milestone],
     start_date: date,
+    resources: ResourceCollection | None = None,
 ) -> dict:
+    if resources is None:
+        resources = ResourceCollection([])
     real_ids = {a.id for a in activities if not a.is_dummy}
     tasks = []
     for a in activities:
         if a.is_dummy:
             continue
         start_offset = int(a.earliest_start)
-        duration = max(1, ceil(a.duration))
+        duration = max(1, ceil(compute_duration(a, resources)))
         task_start = add_working_days(start_date, start_offset)
         task_end = add_working_days(task_start, duration)
         preds = sorted(f"T{p}" for p in a.predecessors if p in real_ids)

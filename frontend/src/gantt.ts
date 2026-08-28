@@ -27,7 +27,9 @@ export interface GanttData {
   milestones: GanttMilestone[];
 }
 
-export function renderGantt(container: HTMLElement, data: GanttData): void {
+export type GanttViewMode = "Day" | "Week" | "Month" | "Year";
+
+export function renderGantt(container: HTMLElement, data: GanttData, viewMode: GanttViewMode = "Day"): void {
   container.innerHTML = "";
   if (!data.tasks.length && !data.milestones.length) {
     container.innerHTML = '<p class="graph-empty">No activities to display.</p>';
@@ -63,7 +65,7 @@ export function renderGantt(container: HTMLElement, data: GanttData): void {
   const allTasks = [...frappeTasks, ...frappeMilestones];
 
   new Gantt(wrapper, allTasks, {
-    view_mode: "Day",
+    view_mode: viewMode,
     date_format: "YYYY-MM-DD",
     bar_height: 20,
     bar_corner_radius: 3,

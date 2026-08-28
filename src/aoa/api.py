@@ -18,7 +18,7 @@ from aoa.model.cpm import calculate_cpm
 from aoa.model.milestones import Milestone
 from aoa.model.network import Network, create_network
 from aoa.model.project import Project, load_yaml_project, save_yaml_project
-from aoa.model.resources import Resource
+from aoa.model.resources import Resource, ResourceCollection
 from aoa.model.state import State
 from aoa.transform.coloring_strategy import ColoringStrategies
 from aoa.transform.dot import create_dot
@@ -259,7 +259,8 @@ def post_network():
         activities = _activities_from_json(activities_data)
         activity_collection = ActivityCollection(activities=activities)
         network = create_network(activity_collection)
-        calculate_cpm(network)
+        resources = ResourceCollection(resources=_resources_from_json(data.get("resources", [])))
+        calculate_cpm(network, resources)
         graph = _network_to_graph_json(network)
         return jsonify(graph)
     except Exception as e:
@@ -281,7 +282,8 @@ def post_network_dot():
         activities = _activities_from_json(activities_data)
         activity_collection = ActivityCollection(activities=activities)
         network = create_network(activity_collection)
-        calculate_cpm(network)
+        resources = ResourceCollection(resources=_resources_from_json(data.get("resources", [])))
+        calculate_cpm(network, resources)
         nx_graph = to_networkx(network)
         theme = resolve_theme(data.get("theme"))
         rankdir = data.get("rankdir", "TB")
@@ -313,9 +315,11 @@ def post_network_gantt():
         activities = _activities_from_json(activities_data)
         activity_collection = ActivityCollection(activities=activities)
         network = create_network(activity_collection)
-        calculate_cpm(network)
 
         milestones = _milestones_from_json(data.get("milestones", []))
+        resources_list = _resources_from_json(data.get("resources", []))
+        resources = ResourceCollection(resources=resources_list)
+        calculate_cpm(network, resources)
         start_str = data.get("start")
         start_date = date.fromisoformat(start_str) if start_str else date.today()
 
@@ -324,7 +328,7 @@ def post_network_gantt():
             (a for a in network.activities.values() if not a.is_dummy),
             key=lambda a: a.id,
         )
-        text = build_gantt_data(real_activities, milestones, start_date)
+        text = build_gantt_data(real_activities, milestones, start_date, resources)
         return jsonify(text)
     except Exception as e:
         return jsonify({"error": str(e)}), 400

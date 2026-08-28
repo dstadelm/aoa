@@ -30,7 +30,7 @@ def create_footer() -> str:
 
 def create_tasks(activities: list[Activity]) -> list[str]:
     return [
-        f"[{activity.activity}] as [TASK_{activity.id}] requires {activity.duration} days" for activity in activities
+        f"[{activity.activity}] as [TASK_{activity.id}] requires {activity.planned_effort} days" for activity in activities
     ]
 
 

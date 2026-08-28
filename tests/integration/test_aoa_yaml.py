@@ -21,10 +21,11 @@ def test_aoa_yaml_loads_and_builds_network() -> None:
     nodes = network.get_node_list_sorted_by_depth()
     assert len(nodes) == 13
 
-    calculate_cpm(network)
+    calculate_cpm(network, project.get_resources())
 
     critical_ids = sorted(a.id for a in activities.values() if not a.is_dummy and a.critical)
     assert critical_ids == [3, 5, 10, 13, 15]
 
     project_duration = max(a.earliest_finish for a in activities.values())
-    assert project_duration == 80.0
+    # Critical-path effort = 80 days at 70% workload → 80 / 0.7 ≈ 114.2857
+    assert project_duration == 80.0 / 0.7

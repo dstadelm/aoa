@@ -2,7 +2,7 @@ import { loadProject, saveProject, computeNetwork, computeNetworkDot, computeNet
 import { initTabs, type TabName } from "./tabs";
 import { renderActivitiesTable, renderResourcesTable, renderMilestonesTable, renderProjectForm } from "./tables";
 import { renderGraph, type LayoutOptions } from "./graph";
-import { renderGantt, type GanttData } from "./gantt";
+import { renderGantt, type GanttData, type GanttViewMode } from "./gantt";
 import type { ProjectData, GraphData } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -245,17 +245,17 @@ btnCompute.addEventListener("click", async () => {
   try {
     const renderer = optRenderer.value;
     if (renderer === "graphviz") {
-      dotSvg = await computeNetworkDot(project.activities, themeSelect.value, optRankdir.value);
+      dotSvg = await computeNetworkDot(project.activities, themeSelect.value, optRankdir.value, project.resources);
       graphData = null;
       ganttData = null;
       renderDotSvg();
     } else if (renderer === "gantt") {
-      ganttData = await computeNetworkGantt(project.activities, project.milestones, project.start);
+      ganttData = await computeNetworkGantt(project.activities, project.milestones, project.start, project.resources);
       graphData = null;
       dotSvg = null;
-      renderGantt(graphContainer, ganttData);
+      renderGantt(graphContainer, ganttData, optGanttView.value as GanttViewMode);
     } else {
-      graphData = await computeNetwork(project.activities);
+      graphData = await computeNetwork(project.activities, project.resources);
       dotSvg = null;
       ganttData = null;
       renderGraph(graphContainer, graphData, getLayoutOptions());
@@ -274,6 +274,7 @@ const optRenderer = document.getElementById("opt-renderer") as HTMLSelectElement
 const optRanker = document.getElementById("opt-ranker") as HTMLSelectElement;
 const optRankdir = document.getElementById("opt-rankdir") as HTMLSelectElement;
 const optAlign = document.getElementById("opt-align") as HTMLSelectElement;
+const optGanttView = document.getElementById("opt-gantt-view") as HTMLSelectElement;
 
 function getLayoutOptions(): LayoutOptions {
   return {
@@ -312,7 +313,7 @@ optRenderer.addEventListener("change", async () => {
       renderDotSvg();
     } else if (project.activities.length) {
       try {
-        dotSvg = await computeNetworkDot(project.activities, themeSelect.value, optRankdir.value);
+        dotSvg = await computeNetworkDot(project.activities, themeSelect.value, optRankdir.value, project.resources);
         renderDotSvg();
       } catch (e: any) {
         showStatus(`Compute failed: ${e.message}`, true);
@@ -320,11 +321,11 @@ optRenderer.addEventListener("change", async () => {
     }
   } else if (renderer === "gantt") {
     if (ganttData) {
-      renderGantt(graphContainer, ganttData);
+      renderGantt(graphContainer, ganttData, optGanttView.value as GanttViewMode);
     } else if (project.activities.length) {
       try {
-        ganttData = await computeNetworkGantt(project.activities, project.milestones, project.start);
-        renderGantt(graphContainer, ganttData);
+        ganttData = await computeNetworkGantt(project.activities, project.milestones, project.start, project.resources);
+        renderGantt(graphContainer, ganttData, optGanttView.value as GanttViewMode);
       } catch (e: any) {
         showStatus(`Compute failed: ${e.message}`, true);
       }
@@ -334,7 +335,7 @@ optRenderer.addEventListener("change", async () => {
       renderGraph(graphContainer, graphData, getLayoutOptions());
     } else if (project.activities.length) {
       try {
-        graphData = await computeNetwork(project.activities);
+        graphData = await computeNetwork(project.activities, project.resources);
         renderGraph(graphContainer, graphData, getLayoutOptions());
       } catch (e: any) {
         showStatus(`Compute failed: ${e.message}`, true);
@@ -343,12 +344,18 @@ optRenderer.addEventListener("change", async () => {
   }
 });
 
+optGanttView.addEventListener("change", () => {
+  if (optRenderer.value === "gantt" && ganttData) {
+    renderGantt(graphContainer, ganttData, optGanttView.value as GanttViewMode);
+  }
+});
+
 [optRanker, optRankdir, optAlign].forEach((sel) => {
   sel.addEventListener("change", async () => {
     if (optRenderer.value === "graphviz") {
       if (sel === optRankdir && project.activities.length) {
         try {
-          dotSvg = await computeNetworkDot(project.activities, themeSelect.value, optRankdir.value);
+          dotSvg = await computeNetworkDot(project.activities, themeSelect.value, optRankdir.value, project.resources);
           renderDotSvg();
         } catch (e: any) {
           showStatus(`Compute failed: ${e.message}`, true);
@@ -396,7 +403,7 @@ themeSelect.addEventListener("change", async () => {
   localStorage.setItem("aoa-theme", theme);
   if (optRenderer.value === "graphviz" && project.activities.length) {
     try {
-      dotSvg = await computeNetworkDot(project.activities, theme, optRankdir.value);
+      dotSvg = await computeNetworkDot(project.activities, theme, optRankdir.value, project.resources);
       renderDotSvg();
     } catch (e: any) {
       showStatus(`Compute failed: ${e.message}`, true);

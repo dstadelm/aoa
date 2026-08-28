@@ -55,7 +55,7 @@ class Node:
     def earliest_start(self) -> float:
         if self.is_end:
             return max(
-                [activity.earliest_start + activity.duration for activity in self.inbound_activities], default=0.0
+                [activity.earliest_finish for activity in self.inbound_activities], default=0.0
             )
         else:
             return self.outbound_activities[0].earliest_start

@@ -8,7 +8,7 @@ resources:
 - id: DST
   name: David Stadelmann
   weekdays: "1110100"
-  workload: 0.7
+  workload: 70
   holidays: []
 activities:
 - id: 1

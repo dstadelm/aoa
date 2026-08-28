@@ -9,6 +9,8 @@ import type { GraphData, GraphEdge } from "./types";
 const NODE_RADIUS = 20;
 const NODE_SIZE = NODE_RADIUS * 2;
 const ARROW_ID = "arrowhead";
+const LABEL_PADDING = 8;
+const LINE_HEIGHT_EM = 1.15;
 
 export interface LayoutOptions {
   ranker: string;
@@ -52,6 +54,45 @@ export function renderGraph(container: HTMLElement, data: GraphData, options?: L
 
   const colors = getThemeColors();
 
+  // Create the target SVG upfront so we can measure text against the actual CSS
+  // (font-family / size inherited by `.edge-label`).
+  const svg = d3
+    .select(container)
+    .append("svg")
+    .attr("width", "100%")
+    .attr("height", "100%")
+    .attr("class", "network-svg");
+
+  // Hidden measurement group. Removed after the pre-layout pass.
+  const measureGroup = svg.append("g").attr("visibility", "hidden");
+  const measureText = measureGroup.append("text").attr("class", "edge-label").node() as SVGTextElement;
+  const fontSizePx = parseFloat(window.getComputedStyle(measureText).fontSize) || 10;
+  const lineHeightPx = fontSizePx * LINE_HEIGHT_EM;
+
+  interface LabelInfo {
+    lines: string[];
+    width: number;
+    height: number;
+  }
+  const labelInfo = new Map<number, LabelInfo>();
+
+  data.edges.forEach((e, i) => {
+    if (e.isDummy || !e.label) return;
+    const lines = e.label.split("\n");
+    let maxW = 0;
+    for (const ln of lines) {
+      measureText.textContent = ln;
+      const w = measureText.getBBox().width;
+      if (w > maxW) maxW = w;
+    }
+    labelInfo.set(i, {
+      lines,
+      width: maxW + LABEL_PADDING,
+      height: lines.length * lineHeightPx + LABEL_PADDING,
+    });
+  });
+  measureGroup.remove();
+
   // Build dagre graph
   const g = new dagre.graphlib.Graph();
   const graphOpts: Record<string, any> = {
@@ -71,7 +112,14 @@ export function renderGraph(container: HTMLElement, data: GraphData, options?: L
   });
 
   data.edges.forEach((e, i) => {
-    g.setEdge(String(e.source), String(e.target), { index: i });
+    const info = labelInfo.get(i);
+    const edgeAttrs: Record<string, any> = { index: i };
+    if (info) {
+      edgeAttrs.width = info.width;
+      edgeAttrs.height = info.height;
+      edgeAttrs.labelpos = "c";
+    }
+    g.setEdge(String(e.source), String(e.target), edgeAttrs);
   });
 
   dagre.layout(g);
@@ -79,13 +127,6 @@ export function renderGraph(container: HTMLElement, data: GraphData, options?: L
   const graphMeta = g.graph();
   const svgWidth = (graphMeta.width ?? 600) + 60;
   const svgHeight = (graphMeta.height ?? 400) + 60;
-
-  const svg = d3
-    .select(container)
-    .append("svg")
-    .attr("width", "100%")
-    .attr("height", "100%")
-    .attr("class", "network-svg");
 
   // Arrow marker
   svg
@@ -158,16 +199,29 @@ export function renderGraph(container: HTMLElement, data: GraphData, options?: L
       : `[${e.activityId}] ${e.label}\nES: ${e.earliestStart}  D: ${e.planned_effort}  EF: ${e.earliestFinish}\nLS: ${e.latestStart}  TF: ${e.totalFloat}  LF: ${e.latestFinish}\nFF: ${e.freeFloat}`;
     path.append("title").text(title);
 
-    // Edge label
-    if (!e.isDummy && points.length > 1) {
-      const mid = points[Math.floor(points.length / 2)];
-      edgeGroup
+    // Edge label (multi-line via explicit \n; dagre reserved space for it).
+    // Draw above the arrow (like the previous behavior) rather than on top of it.
+    const info = labelInfo.get(idx);
+    if (info && !e.isDummy) {
+      const cx = edgeData.x as number;
+      const cy = edgeData.y as number;
+      // Shift the whole text block up so its bottom sits just above the arrow center.
+      const totalHeight = info.lines.length * lineHeightPx;
+      const startY = cy - totalHeight / 2 - 4;
+      const label = edgeGroup
         .append("text")
-        .attr("x", mid.x)
-        .attr("y", mid.y - 8)
+        .attr("x", cx)
+        .attr("y", startY)
         .attr("text-anchor", "middle")
-        .attr("class", "edge-label")
-        .text(e.label);
+        .attr("dominant-baseline", "middle")
+        .attr("class", "edge-label");
+      info.lines.forEach((ln, li) => {
+        label
+          .append("tspan")
+          .attr("x", cx)
+          .attr("dy", li === 0 ? "0" : `${LINE_HEIGHT_EM}em`)
+          .text(ln);
+      });
     }
   });
 

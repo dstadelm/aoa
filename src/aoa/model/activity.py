@@ -19,7 +19,6 @@ class ActivityProtocol:
     latest_finish: float
     earliest_finish: float
     latest_start: float
-    total_float: float
     free_float: float
 
 
@@ -35,23 +34,13 @@ class Activity:
     state: State = field(default=State.OPEN, eq=False)
     earliest_start: float = field(default=0.0, eq=False)
     latest_finish: float = field(default=0.0, eq=False)
+    earliest_finish: float = field(default=0.0, eq=False)
+    latest_start: float = field(default=0.0, eq=False)
     free_float: float = field(default=0.0, eq=False)
 
     @override
     def __repr__(self):
         return f"    Activity {str(self.id)}"
-
-    @property
-    def earliest_finish(self) -> float:
-        return self.earliest_start + self.duration
-
-    @property
-    def latest_start(self) -> float:
-        return self.latest_finish - self.duration
-
-    @property
-    def duration(self) -> float:
-        return self.planned_effort
 
     @property
     def total_float(self) -> float:

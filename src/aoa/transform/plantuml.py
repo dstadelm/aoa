@@ -2,8 +2,10 @@ from pathlib import Path
 from typing import Optional
 
 from aoa.model.activity import Activity
+from aoa.model.duration import duration as compute_duration
 from aoa.model.network import Network
 from aoa.model.node import Node
+from aoa.model.resources import ResourceCollection
 
 from .coloring_strategy import ColoringStrategyProtocol
 from .theme import Theme
@@ -13,12 +15,14 @@ class PlantUml:
     def __init__(
         self,
         network: Network,
+        resources: Optional[ResourceCollection] = None,
         theme: Optional[Theme] = None,
         coloring_strategy: Optional[ColoringStrategyProtocol] = None,
     ):
         self.plantuml: str = ""
         self.sorted_nodes: list[Node] = network.get_node_list_sorted_by_depth()
         self.network: Network = network
+        self.resources: ResourceCollection = resources if resources is not None else ResourceCollection([])
         self.theme: Optional[Theme] = theme
         self._activity_color_tokens: dict[int, str] = {}
         if coloring_strategy is not None:
@@ -93,7 +97,7 @@ title Pert: Project Design
             (
                 f"{self.network.get_activity_nodes(activity).start_node.id} -{self._line_fmt(activity)}-> {self.network.get_activity_nodes(activity).end_node.id}"
                 if activity.is_dummy
-                else f"{self.network.get_activity_nodes(activity).start_node.id} -{self._line_fmt(activity)}-> {self.network.get_activity_nodes(activity).end_node.id} : {activity.activity} (Id={activity.id}, D={activity.duration}, TF={activity.total_float}, FF={activity.free_float})"
+                else f"{self.network.get_activity_nodes(activity).start_node.id} -{self._line_fmt(activity)}-> {self.network.get_activity_nodes(activity).end_node.id} : {activity.activity} (Id={activity.id}, D={compute_duration(activity, self.resources)}, TF={activity.total_float}, FF={activity.free_float})"
             )
             for node in self.sorted_nodes
             for activity in node.outbound_activities

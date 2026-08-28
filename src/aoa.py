@@ -26,7 +26,7 @@ if __name__ == "__main__":
     file = Path("tests/artefacts/more_tricky.yaml")
     project = load_yaml_project(file)
     network = create_network(project.get_activities())
-    calculate_cpm(network)
+    calculate_cpm(network, project.get_resources())
     # plantuml = PlantUml(network)
     # print(plantuml.get_txt())
 
