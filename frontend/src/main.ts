@@ -1,7 +1,8 @@
-import { loadProject, saveProject, computeNetwork, computeNetworkDot } from "./api";
+import { loadProject, saveProject, computeNetwork, computeNetworkDot, computeNetworkGantt } from "./api";
 import { initTabs, type TabName } from "./tabs";
 import { renderActivitiesTable, renderResourcesTable, renderMilestonesTable, renderProjectForm } from "./tables";
 import { renderGraph, type LayoutOptions } from "./graph";
+import { renderGantt, type GanttData } from "./gantt";
 import type { ProjectData, GraphData } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -18,6 +19,7 @@ let project: ProjectData = {
 let currentTab: TabName = "activities";
 let graphData: GraphData | null = null;
 let dotSvg: string | null = null;
+let ganttData: GanttData | null = null;
 
 // ---------------------------------------------------------------------------
 // DOM refs
@@ -114,10 +116,17 @@ btnCompute.addEventListener("click", async () => {
     if (renderer === "graphviz") {
       dotSvg = await computeNetworkDot(project.activities, themeSelect.value, optRankdir.value);
       graphData = null;
+      ganttData = null;
       renderDotSvg();
+    } else if (renderer === "gantt") {
+      ganttData = await computeNetworkGantt(project.activities, project.milestones, project.start);
+      graphData = null;
+      dotSvg = null;
+      renderGantt(graphContainer, ganttData);
     } else {
       graphData = await computeNetwork(project.activities);
       dotSvg = null;
+      ganttData = null;
       renderGraph(graphContainer, graphData, getLayoutOptions());
     }
     showStatus("Network computed successfully.");
@@ -161,9 +170,11 @@ function redrawGraph(): void {
 // When renderer changes, redraw with available data or prompt recompute
 optRenderer.addEventListener("change", async () => {
   const renderer = optRenderer.value;
-  // Show/hide d3-dagre-only options
-  const dagreOnly = document.querySelectorAll<HTMLElement>(".dagre-only");
-  dagreOnly.forEach((el) => (el.style.display = renderer === "d3-dagre" ? "" : "none"));
+  // Show/hide renderer-specific options
+  document.querySelectorAll<HTMLElement>(".renderer-opt").forEach((el) => {
+    const supported = (el.dataset.renderer ?? "").split(/\s+/);
+    el.style.display = supported.includes(renderer) ? "" : "none";
+  });
 
   if (renderer === "graphviz") {
     if (dotSvg) {
@@ -172,6 +183,17 @@ optRenderer.addEventListener("change", async () => {
       try {
         dotSvg = await computeNetworkDot(project.activities, themeSelect.value, optRankdir.value);
         renderDotSvg();
+      } catch (e: any) {
+        showStatus(`Compute failed: ${e.message}`, true);
+      }
+    }
+  } else if (renderer === "gantt") {
+    if (ganttData) {
+      renderGantt(graphContainer, ganttData);
+    } else if (project.activities.length) {
+      try {
+        ganttData = await computeNetworkGantt(project.activities, project.milestones, project.start);
+        renderGantt(graphContainer, ganttData);
       } catch (e: any) {
         showStatus(`Compute failed: ${e.message}`, true);
       }
@@ -255,3 +277,5 @@ themeSelect.addEventListener("change", async () => {
 
 renderCurrentTable();
 graphContainer.innerHTML = '<p class="graph-empty">Load a YAML project and click "Compute Network" to see the diagram.</p>';
+// Initialize renderer-specific option visibility
+optRenderer.dispatchEvent(new Event("change"));

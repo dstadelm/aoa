@@ -22,6 +22,7 @@ from aoa.model.resources import Resource
 from aoa.model.state import State
 from aoa.transform.coloring_strategy import ColoringStrategies
 from aoa.transform.dot import create_dot
+from aoa.transform.gantt_data import build_gantt_data
 from aoa.transform.theme import resolve_theme
 from aoa.transform.to_networkx import to_networkx
 
@@ -293,6 +294,38 @@ def post_network_dot():
 
 def main():
     app.run(debug=True, port=5000)
+
+
+@app.route("/api/network/gantt", methods=["POST"])
+def post_network_gantt():
+    """Compute CPM and return a Mermaid gantt diagram text."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing JSON body"}), 400
+
+    activities_data = data.get("activities", [])
+    if not activities_data:
+        return jsonify({"error": "No activities provided"}), 400
+
+    try:
+        activities = _activities_from_json(activities_data)
+        activity_collection = ActivityCollection(activities=activities)
+        network = create_network(activity_collection)
+        calculate_cpm(network)
+
+        milestones = _milestones_from_json(data.get("milestones", []))
+        start_str = data.get("start")
+        start_date = date.fromisoformat(start_str) if start_str else date.today()
+
+        # Only real (non-dummy) activities, sorted by id for stable output
+        real_activities = sorted(
+            (a for a in network.activities.values() if not a.is_dummy),
+            key=lambda a: a.id,
+        )
+        text = build_gantt_data(real_activities, milestones, start_date)
+        return jsonify(text)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 
 if __name__ == "__main__":

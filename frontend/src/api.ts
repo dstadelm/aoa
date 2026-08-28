@@ -1,4 +1,5 @@
 import type { ProjectData, GraphData, ActivityData } from "./types";
+import type { GanttData } from "./gantt";
 
 const API_BASE = "/api";
 
@@ -24,6 +25,21 @@ export async function computeNetwork(activities: ActivityData[]): Promise<GraphD
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ activities }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+export async function computeNetworkGantt(
+  activities: ActivityData[],
+  milestones: any[],
+  start: string,
+): Promise<GanttData> {
+  const res = await fetch(`${API_BASE}/network/gantt`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ activities, milestones, start }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error);

@@ -58,16 +58,17 @@
             <select id="opt-renderer">
               <option value="d3-dagre">d3-dagre</option>
               <option value="graphviz">Graphviz DOT</option>
+              <option value="gantt">Gantt (Frappe)</option>
             </select>
           </label>
-          <label class="dagre-only">Ranker:
+          <label class="renderer-opt" data-renderer="d3-dagre">Ranker:
             <select id="opt-ranker">
               <option value="network-simplex">Network Simplex</option>
               <option value="tight-tree">Tight Tree</option>
               <option value="longest-path">Longest Path</option>
             </select>
           </label>
-          <label>Direction:
+          <label class="renderer-opt" data-renderer="d3-dagre graphviz">Direction:
             <select id="opt-rankdir">
               <option value="TB">Top → Bottom</option>
               <option value="LR">Left → Right</option>
@@ -75,7 +76,7 @@
               <option value="RL">Right → Left</option>
             </select>
           </label>
-          <label class="dagre-only">Align:
+          <label class="renderer-opt" data-renderer="d3-dagre">Align:
             <select id="opt-align">
               <option value="">None</option>
               <option value="UL">Up-Left</option>
