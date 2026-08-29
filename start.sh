@@ -3,23 +3,24 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Start Flask backend
+# Start Flask backend (in its own process group so we can kill the reloader child too)
 echo "Starting Flask API on http://localhost:5000 ..."
-PYTHONPATH="$SCRIPT_DIR/src" python -m aoa.api &
+setsid env PYTHONPATH="$SCRIPT_DIR/src" FLASK_APP="$SCRIPT_DIR/src/aoa/api.py" \
+  poetry run python -m flask run --port 5000 --no-reload &
 FLASK_PID=$!
 
-# Start Vite dev server
+# Start Vite dev server (also in its own process group)
 echo "Starting Vite frontend on http://localhost:3000 ..."
-cd "$SCRIPT_DIR/frontend" && npm run dev &
+setsid npm --prefix "$SCRIPT_DIR/frontend" run dev &
 VITE_PID=$!
 
-# Cleanup on exit
+# Cleanup on exit — kill entire process groups
 cleanup() {
   echo ""
   echo "Shutting down..."
-  kill $FLASK_PID 2>/dev/null
-  kill $VITE_PID 2>/dev/null
-  wait
+  kill -TERM -"$FLASK_PID" 2>/dev/null
+  kill -TERM -"$VITE_PID" 2>/dev/null
+  wait 2>/dev/null
 }
 trap cleanup EXIT INT TERM
 

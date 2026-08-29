@@ -108,6 +108,25 @@ def _resources_from_json(data: list[dict]) -> list[Resource]:
     ]
 
 
+def _format_exception(e: BaseException) -> str:
+    """Flatten cattrs/ExceptionGroup errors into a readable multi-line message."""
+    parts: list[str] = []
+
+    def walk(exc: BaseException, prefix: str = "") -> None:
+        msg = str(exc) or exc.__class__.__name__
+        parts.append(f"{prefix}{exc.__class__.__name__}: {msg}")
+        # Python 3.11+ ExceptionGroup
+        sub = getattr(exc, "exceptions", None)
+        if sub:
+            for s in sub:
+                walk(s, prefix + "  ")
+        if exc.__cause__ is not None:
+            walk(exc.__cause__, prefix + "  caused by: ")
+
+    walk(e)
+    return "\n".join(parts)
+
+
 def _milestones_from_json(data: list[dict]) -> list[Milestone]:
     return [
         Milestone(
@@ -211,7 +230,7 @@ def get_project():
         project = load_yaml_project(path)
         return jsonify({"file": str(path), "project": _project_to_json(project)})
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": _format_exception(e)}), 400
 
 
 @app.route("/api/project", methods=["POST"])
@@ -241,7 +260,7 @@ def post_project():
         save_yaml_project(project, path)
         return jsonify({"status": "ok", "file": str(path)})
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": _format_exception(e)}), 400
 
 
 @app.route("/api/network", methods=["POST"])
@@ -264,7 +283,7 @@ def post_network():
         graph = _network_to_graph_json(network)
         return jsonify(graph)
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": _format_exception(e)}), 400
 
 
 @app.route("/api/network/dot", methods=["POST"])
@@ -293,7 +312,7 @@ def post_network_dot():
         svg_bytes = agraph.draw(format="svg", prog="dot")
         return app.response_class(svg_bytes, mimetype="image/svg+xml")
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": _format_exception(e)}), 400
 
 
 def main():
@@ -331,7 +350,7 @@ def post_network_gantt():
         text = build_gantt_data(real_activities, milestones, start_date, resources)
         return jsonify(text)
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": _format_exception(e)}), 400
 
 
 if __name__ == "__main__":

@@ -40,6 +40,21 @@ def build_gantt_data(
     if resources is None:
         resources = ResourceCollection([])
     real_ids = {a.id for a in activities if not a.is_dummy}
+
+    # Coloring thresholds (exponential, matches api.py graph edges)
+    max_float = max((a.total_float for a in activities if not a.is_dummy), default=0.0)
+    low_threshold = round(max_float / 9)
+    medium_threshold = round(max_float / 3)
+
+    def color_for(a: Activity) -> str:
+        if a.critical:
+            return "critical"
+        if a.total_float < low_threshold:
+            return "red"
+        if a.total_float < medium_threshold:
+            return "orange"
+        return "green"
+
     tasks = []
     for a in activities:
         if a.is_dummy:
@@ -57,6 +72,7 @@ def build_gantt_data(
                 "end": task_end.isoformat(),
                 "duration": duration,
                 "critical": a.critical,
+                "color": color_for(a),
                 "predecessors": preds,
             }
         )

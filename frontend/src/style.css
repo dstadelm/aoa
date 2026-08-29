@@ -643,16 +643,40 @@ main {
 }
 
 .gantt .bar-critical .bar {
-  fill: var(--graph-critical);
+  fill: var(--graph-critical) !important;
 }
 
 .gantt .bar-critical .bar-progress {
-  fill: var(--graph-critical);
+  fill: var(--graph-critical) !important;
+  filter: brightness(0.85);
+}
+
+.gantt .bar-color-red .bar {
+  fill: var(--graph-red) !important;
+}
+.gantt .bar-color-red .bar-progress {
+  fill: var(--graph-red) !important;
+  filter: brightness(0.85);
+}
+
+.gantt .bar-color-orange .bar {
+  fill: var(--graph-orange) !important;
+}
+.gantt .bar-color-orange .bar-progress {
+  fill: var(--graph-orange) !important;
+  filter: brightness(0.85);
+}
+
+.gantt .bar-color-green .bar {
+  fill: var(--graph-green) !important;
+}
+.gantt .bar-color-green .bar-progress {
+  fill: var(--graph-green) !important;
   filter: brightness(0.85);
 }
 
 .gantt .bar-milestone .bar {
-  fill: var(--graph-orange);
+  fill: var(--graph-orange) !important;
   stroke: var(--node-stroke);
   stroke-width: 1;
 }
@@ -665,13 +689,19 @@ main {
 
 /* Default (inside-bar) label: readable on the default bar fill */
 .gantt .bar-label {
-  fill: #ffffff;
-  font-weight: 600;
+  fill: #ffffff !important;
+  font-weight: 600 !important;
 }
 
 /* When the bar is too narrow, Frappe adds .big and places the label
-   outside the bar. Use the theme text color so it stays legible. */
+   outside the bar. Use the theme text color so it stays legible.
+   Add a subtle stroke via paint-order so it's readable if it overlaps
+   the next bar. */
 .gantt .bar-label.big {
-  fill: var(--text);
-  font-weight: 500;
+  fill: var(--text) !important;
+  font-weight: 600 !important;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }

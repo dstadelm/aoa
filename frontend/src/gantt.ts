@@ -12,6 +12,7 @@ export interface GanttTask {
   end: string;
   duration: number;
   critical: boolean;
+  color?: "critical" | "red" | "orange" | "green" | "";
   predecessors: string[];
 }
 
@@ -41,15 +42,22 @@ export function renderGantt(container: HTMLElement, data: GanttData, viewMode: G
   container.appendChild(wrapper);
 
   // Map tasks to Frappe format
-  const frappeTasks = data.tasks.map((t) => ({
-    id: t.id,
-    name: `[${t.id}] ${t.label}`,
-    start: t.start,
-    end: t.end,
-    progress: 0,
-    dependencies: t.predecessors.join(","),
-    custom_class: t.critical ? "bar-critical" : "",
-  }));
+  const frappeTasks = data.tasks.map((t) => {
+    const cls = t.critical
+      ? "bar-critical"
+      : t.color && t.color !== "critical"
+        ? `bar-color-${t.color}`
+        : "";
+    return {
+      id: t.id,
+      name: `[${t.id}] ${t.label}`,
+      start: t.start,
+      end: t.end,
+      progress: 0,
+      dependencies: t.predecessors.join(","),
+      custom_class: cls,
+    };
+  });
 
   // Milestones: zero-duration bars, styled differently
   const frappeMilestones = data.milestones.map((m) => ({
